@@ -1,0 +1,79 @@
+# ============================================
+#  Free Proxy .gitignore
+# ============================================
+
+# ---- Nuitka 编译产物 ----
+vpngate_manager.build/
+vpngate_manager.dist/
+*.build/
+*.dist/
+.venv/
+
+# ---- Debian 打包产物 ----
+*.deb
+
+# ---- Python 缓存 ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ---- 运行时数据 ----
+vpngate_data/
+free_proxy_data/
+logs/
+*.log
+*.tmp
+*.pid
+
+# ---- IDE 和编辑器 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ---- AI 编码助手 ----
+.gemini/
+.cursor/
+.cursorrules
+.aider*
+.codeium/
+.continue/
+.copilot/
+
+# ---- 本地开发文档（不上传 GitHub） ----
+AI开发指令.md
+功能文档.md
+
+# ---- 临时和测试文件 ----
+scratch/
+*连接配置*
+*.bak
+*.orig
+
+# ---- 测试与检查缓存 ----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- 系统文件 ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- 前端产物以及依赖 ----
+*/node_modules/
+frontend/dist/
+frontend/.vite/
+src/free_proxy/web/dist/
+*.tsbuildinfo
