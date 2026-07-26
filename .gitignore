@@ -74,7 +74,8 @@ src/free_proxy/web/dist/
 
 # ---- Go 构建产物 ----
 /dist/
-free-proxy
+# 只忽略根目录编译出的二进制；不要误伤 cmd/free-proxy/ 源码目录
+/free-proxy
 *.test
 *.out
 # 嵌入前端产物目录（构建时生成），但保留占位 index.html 供裸 go build
