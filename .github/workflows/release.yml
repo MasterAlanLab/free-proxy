@@ -1,0 +1,49 @@
+name: Release
+
+# Build and publish the Linux binaries that install.sh downloads.
+# Triggered by pushing a version tag, e.g. `git tag v1.0.0 && git push origin v1.0.0`.
+on:
+  push:
+    tags:
+      - "v*"
+
+# Required for softprops/action-gh-release to create the GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # `make cross` builds the frontend (bun) then cross-compiles the static
+      # CGO-free binaries to dist/free-proxy-linux-{amd64,arm64} — the exact
+      # asset names install.sh fetches. VERSION is stamped into `main.version`.
+      - name: Build frontend and cross-compile binaries
+        run: make cross VERSION="$GITHUB_REF_NAME"
+
+      - name: Generate checksums
+        run: cd dist && sha256sum free-proxy-linux-amd64 free-proxy-linux-arm64 > SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/free-proxy-linux-amd64
+            dist/free-proxy-linux-arm64
+            dist/SHA256SUMS
+          generate_release_notes: true
+          fail_on_unmatched_files: true

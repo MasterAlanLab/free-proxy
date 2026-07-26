@@ -60,6 +60,19 @@ make test         # 运行 Go 测试
 构建顺序：`bun run build`（前端 → `internal/web/dist`）→ `go build`（内嵌前端）。因为无 CGO，可在 macOS 上直接产出 Linux 二进制。
 本地构建产物同样可以直接部署：把二进制拷到目标机器后执行 `sudo ./free-proxy install`。
 
+## 发布 Release
+
+`install.sh` 从 GitHub Releases 下载 `free-proxy-linux-amd64` / `free-proxy-linux-arm64`，这两个资产由
+`.github/workflows/release.yml` 在**推送版本标签**时自动构建并发布（内部即 `make cross`，版本号取自标签）：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0      # 触发 Action：构建前端 + 交叉编译 → 发布 Release（含 SHA256SUMS）
+```
+
+标签需以 `v` 开头（如 `v1.0.0`）。发布完成后，`install.sh` 的 `latest` 下载即可命中该二进制。未打过任何标签前，
+安装脚本会因 Releases 为空而下载失败——首次使用务必先打一个版本标签。
+
 开发时：
 
 ```bash
