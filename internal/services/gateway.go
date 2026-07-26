@@ -1,0 +1,244 @@
+package services
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync"
+
+	"github.com/masteralanlab/free-proxy/internal/config"
+	"github.com/masteralanlab/free-proxy/internal/domain"
+	"github.com/masteralanlab/free-proxy/internal/netx"
+	"github.com/masteralanlab/free-proxy/internal/proxy"
+	"github.com/masteralanlab/free-proxy/internal/store"
+	"github.com/masteralanlab/free-proxy/internal/tunnel"
+)
+
+// GatewayService owns the active exit: it activates/disconnects tunnels, installs
+// policy routing, runs the local proxy, and reports gateway status.
+type GatewayService struct {
+	cfg          *config.Config
+	nodes        *store.NodeRepository
+	settingsRepo *store.SettingsRepository
+	tunnel       *tunnel.Manager
+	router       *netx.PolicyRouter
+	proxy        *proxy.Gateway
+	pool         *ProxyPoolService
+	coordinator  *Coordinator
+
+	opMu              sync.Mutex
+	mu                sync.Mutex
+	lastError         string
+	activeLatencyMS   int
+	exitIP            string
+	exitLatencyMS     int
+	connectionEnabled bool
+	onUnexpectedExit  func(context.Context)
+}
+
+// NewGatewayService constructs a GatewayService.
+func NewGatewayService(cfg *config.Config, nodes *store.NodeRepository, settingsRepo *store.SettingsRepository,
+	mgr *tunnel.Manager, router *netx.PolicyRouter, pg *proxy.Gateway, pool *ProxyPoolService, coordinator *Coordinator) *GatewayService {
+	return &GatewayService{
+		cfg: cfg, nodes: nodes, settingsRepo: settingsRepo, tunnel: mgr, router: router,
+		proxy: pg, pool: pool, coordinator: coordinator, connectionEnabled: true,
+	}
+}
+
+// Start cleans up stale tunnels/routes and launches the local proxy listener.
+func (g *GatewayService) Start(ctx context.Context) error {
+	g.tunnel.CleanupStaleProcesses()
+	_ = g.router.Cleanup(ctx)
+	if g.cfg.ProxyEnabled {
+		return g.proxy.Start(ctx)
+	}
+	return nil
+}
+
+// Activate brings up a node as the exit, serialized via the coordinator.
+func (g *GatewayService) Activate(ctx context.Context, nodeID string) (domain.TunnelStartResult, error) {
+	var res domain.TunnelStartResult
+	err := g.coordinator.Run(ctx, "activate", false, func(ctx context.Context) error {
+		g.opMu.Lock()
+		defer g.opMu.Unlock()
+		var e error
+		res, e = g.activate(ctx, nodeID)
+		return e
+	})
+	return res, err
+}
+
+func (g *GatewayService) activate(ctx context.Context, nodeID string) (domain.TunnelStartResult, error) {
+	slog.Info("activating exit node", "module", "gateway", "node", nodeID)
+	target, err := g.nodes.GetTarget(ctx, nodeID)
+	if err != nil {
+		return domain.TunnelStartResult{}, err
+	}
+	node, err := g.nodes.Get(ctx, nodeID)
+	if err != nil {
+		return domain.TunnelStartResult{}, err
+	}
+	_ = g.settingsRepo.SetConnectionEnabled(ctx, true)
+	g.setConnectionEnabled(true)
+	if err := g.pool.ValidateAllowed(ctx, node); err != nil {
+		return domain.TunnelStartResult{}, err
+	}
+
+	result := g.tunnel.Connect(ctx, nodeID, target.ConfigText)
+	if !result.Success {
+		_ = g.nodes.MarkUnavailable(ctx, nodeID)
+		g.setLastError(result.Message)
+		slog.Warn("activation failed", "module", "gateway", "node", nodeID, "msg", result.Message)
+		return result, nil
+	}
+	if err := g.router.Setup(ctx, g.cfg.TunnelInterface); err != nil {
+		g.tunnel.Disconnect()
+		_ = g.nodes.MarkUnavailable(ctx, nodeID)
+		g.setLastError(err.Error())
+		return domain.TunnelStartResult{}, err
+	}
+	g.setLastError("")
+	g.mu.Lock()
+	g.activeLatencyMS = 0
+	g.mu.Unlock()
+	slog.Info("exit node activated", "module", "gateway", "node", nodeID)
+	return result, nil
+}
+
+// ActivateJob is the JobFunc form of Activate.
+func (g *GatewayService) ActivateJob(nodeID string) JobFunc {
+	return func(ctx context.Context) (map[string]any, error) {
+		res, err := g.Activate(ctx, nodeID)
+		if err != nil {
+			return nil, err
+		}
+		return toMap(res)
+	}
+}
+
+// Disconnect disables connections and tears down the exit.
+func (g *GatewayService) Disconnect(ctx context.Context) {
+	g.opMu.Lock()
+	defer g.opMu.Unlock()
+	_ = g.settingsRepo.SetConnectionEnabled(ctx, false)
+	g.setConnectionEnabled(false)
+	g.disconnectOnly(ctx)
+}
+
+// DisconnectOnly tears down the exit without changing the enabled flag.
+func (g *GatewayService) DisconnectOnly(ctx context.Context) {
+	g.disconnectOnly(ctx)
+}
+
+func (g *GatewayService) disconnectOnly(ctx context.Context) {
+	activeID := g.tunnel.ActiveNodeID()
+	_ = g.router.Cleanup(ctx)
+	g.tunnel.Disconnect()
+	g.mu.Lock()
+	g.activeLatencyMS = 0
+	g.exitIP = ""
+	g.exitLatencyMS = 0
+	g.mu.Unlock()
+	if activeID != "" {
+		slog.Info("exit node disconnected", "module", "gateway", "node", activeID)
+	}
+}
+
+// SetConnectionEnabled records the master switch state.
+func (g *GatewayService) SetConnectionEnabled(enabled bool) { g.setConnectionEnabled(enabled) }
+
+func (g *GatewayService) setConnectionEnabled(enabled bool) {
+	g.mu.Lock()
+	g.connectionEnabled = enabled
+	g.mu.Unlock()
+}
+
+func (g *GatewayService) setLastError(msg string) {
+	g.mu.Lock()
+	g.lastError = msg
+	g.mu.Unlock()
+}
+
+// UpdateActiveLatency records the last measured active-node latency.
+func (g *GatewayService) UpdateActiveLatency(ms int) {
+	g.mu.Lock()
+	g.activeLatencyMS = ms
+	g.mu.Unlock()
+}
+
+// UpdateHealth records the last health-check exit IP and latency.
+func (g *GatewayService) UpdateHealth(exitIP string, latencyMS int) {
+	g.mu.Lock()
+	g.exitIP = exitIP
+	g.exitLatencyMS = latencyMS
+	g.mu.Unlock()
+}
+
+// SetUnexpectedExitHandler wires the callback for unexpected tunnel exits.
+func (g *GatewayService) SetUnexpectedExitHandler(h func(context.Context)) {
+	g.mu.Lock()
+	g.onUnexpectedExit = h
+	g.mu.Unlock()
+	g.tunnel.SetExitHandler(g.handleUnexpectedExit)
+}
+
+func (g *GatewayService) handleUnexpectedExit(code int) {
+	if g.tunnel.ActiveNodeID() == "" {
+		return
+	}
+	ctx := context.Background()
+	g.setLastError(fmt.Sprintf("OpenVPN exited unexpectedly (code=%d)", code))
+	_ = g.router.Cleanup(ctx)
+	g.mu.Lock()
+	g.activeLatencyMS = 0
+	g.exitIP = ""
+	g.exitLatencyMS = 0
+	h := g.onUnexpectedExit
+	g.mu.Unlock()
+	g.tunnel.ClearExitedProcess()
+	if h != nil {
+		h(ctx)
+	}
+}
+
+// Status assembles the current gateway status.
+func (g *GatewayService) Status() domain.GatewayStatus {
+	g.mu.Lock()
+	lastError := g.lastError
+	activeLatency := g.activeLatencyMS
+	exitIP := g.exitIP
+	exitLatency := g.exitLatencyMS
+	enabled := g.connectionEnabled
+	g.mu.Unlock()
+
+	activeID := g.tunnel.ActiveNodeID()
+	tunnelStatus := domain.TunnelIdle
+	switch {
+	case g.tunnel.ActiveRunning():
+		tunnelStatus = domain.TunnelConnected
+	case activeID != "":
+		tunnelStatus = domain.TunnelFailed
+	}
+	listener := g.proxy.Addr()
+	status := domain.GatewayStatus{
+		Running:           g.proxy.Running(),
+		TunnelStatus:      tunnelStatus,
+		ProxyListener:     listener,
+		SocksListener:     listener,
+		HTTPListener:      listener,
+		ActiveLatencyMS:   activeLatency,
+		ExitLatencyMS:     exitLatency,
+		ConnectionEnabled: enabled,
+		MonitorStatus:     map[string]any{},
+	}
+	if activeID != "" {
+		status.ActiveNodeID = &activeID
+	}
+	if lastError != "" {
+		status.LastError = &lastError
+	}
+	if exitIP != "" {
+		status.ExitIP = &exitIP
+	}
+	return status
+}

@@ -12,15 +12,6 @@ vpngate_manager.dist/
 # ---- Debian 打包产物 ----
 *.deb
 
-# ---- Python 缓存 ----
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
-*.egg
 
 # ---- 运行时数据 ----
 vpngate_data/
@@ -53,6 +44,9 @@ logs/
 AI开发指令.md
 功能文档.md
 
+# ---- 参考实现（对照用，独立仓库，不纳入本仓库） ----
+aimili-vpngate/
+
 # ---- 临时和测试文件 ----
 scratch/
 *连接配置*
@@ -77,3 +71,12 @@ frontend/dist/
 frontend/.vite/
 src/free_proxy/web/dist/
 *.tsbuildinfo
+
+# ---- Go 构建产物 ----
+/dist/
+free-proxy
+*.test
+*.out
+# 嵌入前端产物目录（构建时生成），但保留占位 index.html 供裸 go build
+internal/web/dist/*
+!internal/web/dist/index.html

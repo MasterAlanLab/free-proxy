@@ -1,36 +1,44 @@
-import React, { useEffect, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api } from "./api";
-import { useStore } from "./store";
+import * as api from "./api";
+import { App } from "./App";
+import { Login } from "./components/Login";
+import { Toasts } from "./components/ui";
 import "./styles.css";
 
-const Button=({children,className="",...props}:React.ButtonHTMLAttributes<HTMLButtonElement>)=><button className={`btn ${className}`} {...props}>{children}</button>;
-const Card=({label,value,tone=""}:{label:string;value:any;tone?:string})=><article className="metric"><span>{label}</span><strong className={tone}>{value??"-"}</strong></article>;
+type View = "loading" | "login" | "app";
 
-function App(){
-  const s=useStore(); const [tab,setTab]=useState("pool"); const pages=Math.max(1,Math.ceil(s.total/s.pageSize));
-  useEffect(()=>{s.load();const timer=setInterval(s.load,10000);return()=>clearInterval(timer)},[]);
-  const probeSelected=()=>s.run("/proxies/probe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:[...s.selected]})});
-  const disconnect=async()=>{if(confirm("断开当前隧道并关闭自动连接？"))await s.run("/gateway/current",{method:"DELETE"})};
-  const health=async()=>{try{const result=await api<any>("/gateway/check",{method:"POST"});alert(result.ok?`出口 ${result.exit_ip}`:`出口检查失败：${result.error||"未知错误"}`);await s.load()}catch(e){alert((e as Error).message)}};
-  const logout=async()=>{await api("/auth/logout",{method:"POST"});location.reload()};
-  return <div className="shell">
-    <header><div><p className="kicker">ROUTED EXIT CONTROL</p><h1>Free Proxy <em>Console</em></h1><p>一个端口，同时提供 SOCKS5 与 HTTP。节点发现、诊断和切换保持在同一控制面。</p></div><div className="header-actions"><span className={`pulse ${s.gateway?.active_node_id?"online":""}`}/><span>{s.gateway?.active_node_id?"出口在线":"等待出口"}</span><Button onClick={()=>s.run("/proxies/refresh")}>更新节点</Button><Button onClick={health}>检查出口</Button><Button onClick={disconnect}>断开</Button><Button onClick={logout}>注销</Button></div></header>
-    {s.error&&<div className="error">{s.error}</div>}
-    <section className="metrics"><Card label="统一代理端口" value={s.gateway?.proxy_listener}/><Card label="当前出口" value={s.gateway?.active_node_id||"未连接"}/><Card label="公网 IP" value={s.gateway?.exit_ip}/><Card label="可用节点" value={s.stats?.ready||0}/><Card label="出口延迟" value={s.gateway?.exit_latency_ms?`${s.gateway.exit_latency_ms} ms`:"-"}/></section>
-    <nav>{[["pool","代理池"],["diagnostics","系统诊断"],["settings","策略与配置"],["logs","运行日志"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}>{label}</button>)}</nav>
-    {tab==="pool"&&<main className="panel">
-      <div className="toolbar"><input placeholder="搜索 IP、国家、ISP" value={s.search} onChange={e=>s.setFilter({search:e.target.value,page:1})}/><select value={s.status} onChange={e=>s.setFilter({status:e.target.value,page:1})}><option value="">全部状态</option><option value="ready">可用</option><option value="probing">探测中</option><option value="discovered">待测试</option><option value="unavailable">不可用</option><option value="cooldown">冷却</option></select><select value={s.ipType} onChange={e=>s.setFilter({ipType:e.target.value,page:1})}><option value="">全部类型</option><option value="residential">住宅</option><option value="mobile">移动</option><option value="hosting">机房</option></select><Button disabled={!s.selected.size||s.busy} onClick={probeSelected}>测试选中 ({s.selected.size})</Button><Button onClick={()=>s.run("/gateway/rotate")}>轮换出口</Button></div>
-      <div className="table-wrap"><table><thead><tr><th></th><th>国家 / 地址</th><th>网络主体</th><th>协议</th><th>类型</th><th>延迟</th><th>状态</th><th>操作</th></tr></thead><tbody>{s.nodes.map(n=><tr key={n.id}><td><input type="checkbox" checked={s.selected.has(n.id)} onChange={()=>s.toggleSelected(n.id)}/></td><td><b>{n.country||n.country_code||"未知"}</b><small>{n.ip_address}</small></td><td>{n.owner||n.as_name||"-"}</td><td>{n.transport.toUpperCase()}</td><td><span className={`tag ${n.ip_type}`}>{n.ip_type}</span></td><td>{n.latency_ms?`${n.latency_ms} ms`:"-"}</td><td>{n.status}</td><td className="actions"><button onClick={()=>s.run(`/proxies/${n.id}/probe`)}>测试</button><button onClick={()=>s.run(`/proxies/${n.id}/activate`)}>连接</button><button onClick={()=>s.run(`/proxies/${n.id}/favorite`)}>{(s.settings?.favorite_node_ids||[]).includes(n.id)?"取消收藏":"收藏"}</button><a href={`./api/v1/proxies/${encodeURIComponent(n.id)}/config`}>配置</a></td></tr>)}</tbody></table></div>
-      <footer className="pagination"><span>共 {s.total} 条，第 {s.page} / {pages} 页</span><select value={s.pageSize} onChange={e=>s.setFilter({pageSize:Number(e.target.value),page:1})}><option>10</option><option>20</option><option>50</option><option>100</option></select><Button disabled={s.page===1} onClick={()=>s.setFilter({page:1})}>首页</Button><Button disabled={s.page===1} onClick={()=>s.setFilter({page:s.page-1})}>上一页</Button><Button disabled={s.page>=pages} onClick={()=>s.setFilter({page:s.page+1})}>下一页</Button><Button disabled={s.page>=pages} onClick={()=>s.setFilter({page:pages})}>末页</Button></footer>
-    </main>}
-    {tab==="diagnostics"&&<Diagnostics/>}{tab==="settings"&&<Settings/>}{tab==="logs"&&<Logs/>}
-  </div>
+function Root() {
+  const [view, setView] = useState<View>("loading");
+
+  useEffect(() => {
+    api.setUnauthorizedHandler(() => setView("login"));
+    api.authConfig().then(
+      () => setView("app"),
+      () => setView("login"),
+    );
+  }, []);
+
+  if (view === "loading") {
+    return (
+      <div className="min-h-full grid place-items-center text-ink-3">
+        <span className="inline-block w-6 h-6 border-2 border-rule-strong border-t-ink rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (view === "login") {
+    return (
+      <>
+        <Login onSuccess={() => setView("app")} />
+        <Toasts />
+      </>
+    );
+  }
+  return <App onLogout={() => setView("login")} />;
 }
 
-function Diagnostics(){const s=useStore();return <main className="panel"><div className="section-head"><div><p className="kicker">PRE-FLIGHT</p><h2>环境诊断</h2></div><div><Button onClick={()=>s.load()}>重新检测</Button> <Button onClick={()=>s.run("/system/dns/repair")}>修复 DNS</Button></div></div><div className="checks">{s.diagnostics?.checks?.map((c:any)=><article className={c.ok?"ok":"bad"} key={c.name}><span>{c.ok?"PASS":"FAIL"}</span><div><b>{c.name}</b><p>{c.detail}</p></div></article>)}</div></main>}
-function Settings(){const s=useStore();const [form,setForm]=useState<any>(null);useEffect(()=>setForm(s.settings),[s.settings]);if(!form)return null;const save=async()=>{if(!form.connection_enabled&&!confirm("关闭自动连接将立即断开当前隧道，继续？"))return;await api("/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});s.load()};return <main className="panel form-panel"><h2>出口策略</h2><label>路由模式<select value={form.routing_mode} onChange={e=>setForm({...form,routing_mode:e.target.value})}><option value="auto">自动（延迟优先）</option><option value="residential_first">住宅优先</option><option value="country">固定国家</option><option value="fixed">固定节点</option><option value="favorites">仅收藏</option></select></label><label>国家<input value={form.force_country||""} onChange={e=>setForm({...form,force_country:e.target.value})}/></label><label>IP 类型<select value={form.routing_ip_type} onChange={e=>setForm({...form,routing_ip_type:e.target.value})}><option value="all">全部</option><option value="residential">住宅/移动</option><option value="hosting">机房</option></select></label><label>固定节点<select value={form.fixed_node_id||""} onChange={e=>setForm({...form,fixed_node_id:e.target.value||null})}><option value="">请选择</option>{s.nodes.map(n=><option key={n.id} value={n.id}>{n.country_code} · {n.ip_address}</option>)}</select></label><label className="switch"><input type="checkbox" checked={form.connection_enabled} onChange={e=>setForm({...form,connection_enabled:e.target.checked})}/>允许自动连接</label><Button onClick={save}>保存策略</Button><ProxyConfig/></main>}
-function ProxyConfig(){const s=useStore();const [f,setF]=useState<any>(null);useEffect(()=>setF(s.credentials),[s.credentials]);if(!f)return null;const save=async()=>{await api("/auth/credentials",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)});};return <section className="subform"><h3>监听与管理配置</h3><label>统一代理地址<input value={f.proxy_host} onChange={e=>setF({...f,proxy_host:e.target.value})}/></label><label>统一代理端口<input type="number" value={f.proxy_port} onChange={e=>setF({...f,proxy_port:Number(e.target.value)})}/></label><label>管理地址<input value={f.host} onChange={e=>setF({...f,host:e.target.value})}/></label><label>管理端口<input type="number" value={f.port} onChange={e=>setF({...f,port:Number(e.target.value)})}/></label><label>安全路径<input value={f.secret_path} onChange={e=>setF({...f,secret_path:e.target.value})}/></label><label>新密码<input type="password" value={f.password||""} onChange={e=>setF({...f,password:e.target.value})}/></label><Button onClick={save}>保存并重启</Button></section>}
-function Logs(){const s=useStore();return <main className="panel"><div className="section-head"><h2>结构化日志</h2><div><input type="date" value={s.logDate} onChange={e=>s.setFilter({logDate:e.target.value})}/><select value={s.logLevel} onChange={e=>s.setFilter({logLevel:e.target.value})}><option value="">全部级别</option><option>INFO</option><option>WARNING</option><option>ERROR</option></select><input placeholder="模块" value={s.logModule} onChange={e=>s.setFilter({logModule:e.target.value})}/><Button onClick={()=>location.assign("./api/v1/logs/export")}>导出</Button></div></div><div className="logs">{[...s.logs].reverse().slice(0,300).map((l:any,i)=><article key={i}><time>{l.timestamp}</time><b>{l.level}</b><span>{l.module}</span><p>{l.message}</p></article>)}</div></main>}
-
-createRoot(document.getElementById("root")!).render(<App/>);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <Root />
+  </StrictMode>,
+);
