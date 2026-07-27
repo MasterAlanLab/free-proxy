@@ -23,7 +23,7 @@ type Config struct {
 	DatabaseURL string `env:"DATABASE_URL"`
 	SQLEcho     bool   `env:"SQL_ECHO" envDefault:"false"`
 
-	WebHost            string `env:"WEB_HOST" envDefault:"127.0.0.1"`
+	WebHost            string `env:"WEB_HOST" envDefault:"0.0.0.0"`
 	WebPort            int    `env:"WEB_PORT" envDefault:"8787"`
 	AdminAuthEnabled   bool   `env:"ADMIN_AUTH_ENABLED" envDefault:"true"`
 	AdminUsername      string `env:"ADMIN_USERNAME"`
@@ -32,7 +32,7 @@ type Config struct {
 	SessionTTLSeconds  int    `env:"SESSION_TTL_SECONDS" envDefault:"2592000"`
 	AllowProcessRestart bool  `env:"ALLOW_PROCESS_RESTART" envDefault:"true"`
 
-	ProxyHost                 string  `env:"PROXY_HOST" envDefault:"127.0.0.1"`
+	ProxyHost                 string  `env:"PROXY_HOST" envDefault:"0.0.0.0"`
 	ProxyPort                 int     `env:"PROXY_PORT" envDefault:"9527"`
 	ProxyEnabled              bool    `env:"PROXY_ENABLED" envDefault:"true"`
 	ProxyUsername             string  `env:"PROXY_USERNAME"`

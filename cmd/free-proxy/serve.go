@@ -47,10 +47,13 @@ func buildDeps(ctx context.Context, cfg *config.Config, db *sql.DB, auth *securi
 	adminCfg := auth.Store.Config()
 	connector := proxy.NewSocketConnector(cfg.TunnelInterface, cfg.ProxyDNSServer, cfg.ProxyConnectTimeout())
 	proxyGateway := proxy.New(proxy.Options{
-		Host: adminCfg.ProxyHost, Port: adminCfg.ProxyPort,
+		Host: "0.0.0.0", Port: adminCfg.ProxyPort,
 		Username: cfg.ProxyUsername, Password: cfg.ProxyPassword,
 		MaxConnections: cfg.ProxyMaxConnections,
 		ConnectTimeout: cfg.ProxyConnectTimeout(), IdleTimeout: cfg.ProxyIdleTimeout(),
+		// Listener binds all interfaces; non-loopback clients are gated at runtime
+		// by the admin toggle (default off) and still require proxy auth.
+		ExternalAllowed: func() bool { return auth.Store.Config().ProxyExternalAllowed() },
 	}, connector)
 
 	pool := services.NewProxyPoolService(repos.Nodes, repos.Settings)
@@ -125,7 +128,9 @@ func runServe(ctx context.Context, cfg *config.Config, hostOverride string, port
 		go deps.MaintenanceMon.Run(ctx)
 	}
 
-	host := firstNonEmptyStr(hostOverride, adminCfg.Host)
+	// Bind all interfaces; external web access is gated at runtime by the admin
+	// toggle (default on) — see api.ExternalAccessGuard. A --host flag still wins.
+	host := firstNonEmptyStr(hostOverride, "0.0.0.0")
 	port := adminCfg.Port
 	if portOverride != 0 {
 		port = portOverride

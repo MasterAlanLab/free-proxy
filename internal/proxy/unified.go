@@ -10,6 +10,10 @@ import (
 // handle sniffs the first byte of a connection and dispatches to SOCKS5 (0x05)
 // or HTTP (ASCII method letter). It enforces the connection cap first.
 func (g *Gateway) handle(ctx context.Context, conn net.Conn) {
+	if !g.allowClient(conn) {
+		_ = conn.Close() // external client blocked by access policy
+		return
+	}
 	select {
 	case g.sem <- struct{}{}:
 		defer func() { <-g.sem }()

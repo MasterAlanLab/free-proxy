@@ -21,6 +21,9 @@ type Options struct {
 	MaxConnections int
 	ConnectTimeout time.Duration
 	IdleTimeout    time.Duration
+	// ExternalAllowed reports (at call time) whether non-loopback clients may use
+	// the proxy. nil denies external access. Loopback clients are always served.
+	ExternalAllowed func() bool
 }
 
 // Gateway is the unified SOCKS5/HTTP proxy server.
@@ -44,6 +47,26 @@ func New(opts Options, connector OutboundConnector) *Gateway {
 
 func (g *Gateway) authEnabled() bool {
 	return g.opts.Username != "" || g.opts.Password != ""
+}
+
+// allowClient decides whether to serve a freshly accepted connection. Loopback
+// clients are always served; external clients require the runtime toggle to be
+// on AND proxy auth to be configured, so the proxy is never an open relay.
+func (g *Gateway) allowClient(conn net.Conn) bool {
+	if isLoopbackAddr(conn.RemoteAddr().String()) {
+		return true
+	}
+	extOK := g.opts.ExternalAllowed != nil && g.opts.ExternalAllowed()
+	return extOK && g.authEnabled()
+}
+
+func isLoopbackAddr(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // Start binds the listener and serves accepted connections in the background.

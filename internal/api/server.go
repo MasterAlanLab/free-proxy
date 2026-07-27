@@ -21,6 +21,7 @@ func NewServer(deps *Deps) *echo.Echo {
 	e := echo.New()
 	e.Validator = &structValidator{v: validator.New()}
 	e.HTTPErrorHandler = errorHandler
+	e.Pre(ExternalAccessGuard(deps.Auth.Store))
 	e.Pre(SecretPath(deps.Auth))
 
 	h := &Handlers{Deps: deps}
@@ -55,6 +56,8 @@ func NewServer(deps *Deps) *echo.Echo {
 	g.GET("/system/status", h.SystemStatus)
 	g.GET("/system/diagnostics", h.SystemDiagnostics)
 	g.POST("/system/dns/repair", h.DNSRepair)
+	g.GET("/system/access", h.GetAccess)
+	g.PUT("/system/access", h.UpdateAccess)
 
 	g.GET("/logs", h.GetLogs)
 	g.GET("/logs/export", h.ExportLogs)

@@ -1,12 +1,37 @@
 package api
 
 import (
+	"net"
 	"net/http"
 	"strings"
 
 	"github.com/labstack/echo/v5"
 	"github.com/masteralanlab/free-proxy/internal/security"
 )
+
+// ExternalAccessGuard blocks non-loopback clients from the web admin when the
+// admin toggle disables external web access. It returns 404 (like SecretPath) to
+// avoid revealing the service. Registered before SecretPath. Uses the real TCP
+// remote address (not X-Forwarded-For) so it cannot be spoofed by a header.
+func ExternalAccessGuard(store *security.AdminConfigStore) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			if store.Config().WebExternalAllowed() || isLoopbackRemote(c.Request().RemoteAddr) {
+				return next(c)
+			}
+			return echo.NewHTTPError(http.StatusNotFound, "Not found")
+		}
+	}
+}
+
+func isLoopbackRemote(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
 
 const (
 	ctxAuthorized = "authorized"

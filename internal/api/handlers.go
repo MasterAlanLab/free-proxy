@@ -303,6 +303,38 @@ func (h *Handlers) UpdateSettings(c *echo.Context) error {
 
 // ---- system -----------------------------------------------------------------
 
+type accessUpdate struct {
+	WebExternalAccess   bool `json:"web_external_access"`
+	ProxyExternalAccess bool `json:"proxy_external_access"`
+}
+
+// GetAccess reports the network-exposure toggles and whether proxy auth is set
+// (external proxy access only takes effect once a proxy password is configured).
+func (h *Handlers) GetAccess(c *echo.Context) error {
+	cfg := h.Deps.Auth.Store.Config()
+	return c.JSON(http.StatusOK, map[string]any{
+		"web_external_access":   cfg.WebExternalAllowed(),
+		"proxy_external_access": cfg.ProxyExternalAllowed(),
+		"proxy_auth_configured": h.Deps.Cfg.ProxyAuthEnabled(),
+	})
+}
+
+// UpdateAccess flips the network-exposure toggles at runtime (no restart).
+func (h *Handlers) UpdateAccess(c *echo.Context) error {
+	var req accessUpdate
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if err := h.Deps.Auth.Store.SetExternalAccess(req.WebExternalAccess, req.ProxyExternalAccess); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"web_external_access":   req.WebExternalAccess,
+		"proxy_external_access": req.ProxyExternalAccess,
+		"proxy_auth_configured": h.Deps.Cfg.ProxyAuthEnabled(),
+	})
+}
+
 func (h *Handlers) SystemStatus(c *echo.Context) error {
 	ctx := c.Request().Context()
 	gw := h.Deps.Gateway.Status()

@@ -97,6 +97,23 @@ type AdminConfig struct {
 	Port         int    `json:"port"`
 	ProxyHost    string `json:"proxy_host"`
 	ProxyPort    int    `json:"proxy_port"`
+	// Network-exposure toggles. Listeners always bind 0.0.0.0; these gate whether
+	// non-loopback clients are actually served, and can be flipped at runtime from
+	// the admin UI. nil means "unset" and falls back to the safe default below.
+	WebExternalAccess   *bool `json:"web_external_access,omitempty"`
+	ProxyExternalAccess *bool `json:"proxy_external_access,omitempty"`
+}
+
+// WebExternalAllowed reports whether the web admin serves non-loopback clients.
+// Default true: the admin UI is already protected by login + a secret path.
+func (c AdminConfig) WebExternalAllowed() bool {
+	return c.WebExternalAccess == nil || *c.WebExternalAccess
+}
+
+// ProxyExternalAllowed reports whether the proxy serves non-loopback clients.
+// Default false: avoids accidentally exposing an open proxy to the internet.
+func (c AdminConfig) ProxyExternalAllowed() bool {
+	return c.ProxyExternalAccess != nil && *c.ProxyExternalAccess
 }
 
 // AdminConfigStore loads/persists the admin config and one-time bootstrap password.
@@ -140,6 +157,21 @@ func (s *AdminConfigStore) Update(c AdminConfig) error {
 	s.config = c
 	s.mu.Unlock()
 	s.ClearBootstrapPassword()
+	return nil
+}
+
+// SetExternalAccess flips the network-exposure toggles at runtime (persisted +
+// in-memory) without touching credentials or the bootstrap password.
+func (s *AdminConfigStore) SetExternalAccess(web, proxy bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := s.config
+	c.WebExternalAccess = &web
+	c.ProxyExternalAccess = &proxy
+	if err := s.write(c); err != nil {
+		return err
+	}
+	s.config = c
 	return nil
 }
 

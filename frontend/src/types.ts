@@ -3,6 +3,12 @@ export type NodeStatus = "discovered" | "probing" | "ready" | "unavailable" | "c
 export type PolicyMode = "auto" | "residential_first" | "country" | "fixed" | "favorites";
 export type RoutingIpType = "all" | "residential" | "hosting";
 
+export interface AccessConfig {
+  web_external_access: boolean;
+  proxy_external_access: boolean;
+  proxy_auth_configured: boolean;
+}
+
 export interface ProxyNode {
   id: string;
   provider: string;
