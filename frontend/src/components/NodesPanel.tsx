@@ -117,7 +117,7 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
           <thead>
             <tr>
               <th className="th w-8"></th>
-              <th className="th">国家 / 主机</th>
+              <th className="th">国家 / 机构</th>
               <th className="th">IP</th>
               <th className="th">类型</th>
               <th className="th">状态</th>
@@ -139,7 +139,9 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
                 </td>
                 <td className="td">
                   <div className="font-medium">{n.country || n.country_code || "—"}</div>
-                  <div className="text-xs text-ink-3 truncate max-w-[220px]">{n.host_name || n.owner || n.as_name}</div>
+                  <div className="text-xs text-ink-3 truncate max-w-[240px]" title={n.host_name || ""}>
+                    {n.owner || n.as_name || n.host_name || "—"}
+                  </div>
                 </td>
                 <td className="td font-mono text-[0.8rem]">{n.ip_address}<div className="text-xs text-ink-3 font-sans">{n.transport}</div></td>
                 <td className="td"><Badge label={ipLabel(n.ip_type)} tone={n.ip_type} /></td>

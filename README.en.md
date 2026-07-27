@@ -69,19 +69,18 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 The script automatically: downloads the build for your architecture → installs system dependencies (openvpn, etc.) → registers an auto-start service → launches it. Just wait for it to finish — no interaction needed.
 
-**Step 3 · Get the admin URL and login credentials**
+**Step 3 · Note down the admin URL and login credentials**
 
-```bash
-free-proxy credentials
-```
-
-It prints something like:
+When the install script finishes, it **prints directly** the path, username, and password randomly generated for this deployment:
 
 ```text
-URL: http://127.0.0.1:8787/xxxxxxxxxxxx/
-Username: xxxxxxxx
-Password: xxxxxxxx
+URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+Username:  xxxxxxxx
+Password:  xxxxxxxx
 ```
+
+> 🔑 The path, username, and password are all **randomly generated on every deployment**, with no defaults whatsoever — save them on the spot (the password cannot be recovered afterward). You can also view them again later with `free-proxy credentials`.
+> ⚠️ Every time you re-run the install (i.e. an update), this set of credentials is **rotated anew**, and the old ones become invalid immediately.
 
 ✅ **Done!** The service is already fetching nodes, running speed tests, and connecting in the background. Next, let's see how to use it.
 
@@ -146,7 +145,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**Update to the latest version**: just run the "one-command install" above again — your configuration and data are preserved.
+**Update to the latest version**: just run the "one-command install" above again. Node data and settings are preserved; however, **the admin path, username, and password are re-randomized and rotated** (a new set is printed when the install finishes — be sure to save it, as the old one becomes invalid immediately).
 
 ---
 

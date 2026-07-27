@@ -1,59 +1,59 @@
 **🌐 Languages:** [中文](README.md) · [English](README.en.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [العربية](README.ar.md) · [Italiano](README.it.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-# 🚀 Free Proxy — Baue deinen eigenen kostenlosen Proxy-Pool mit einem einzigen Befehl
+# 🚀 Free Proxy — Baue mit einem Befehl deinen eigenen kostenlosen Proxy-Pool
 
-> Führe auf einem kleinen ausländischen Server **einen einzigen Befehl** aus: Automatisch werden aus öffentlichen Knotenquellen (VPNGate) hunderte kostenlose Ausgänge abgerufen, real per Geschwindigkeit getestet, die schnellste Route intelligent ausgewählt und nach außen ein stabiler **SOCKS5-/HTTP-Proxy** bereitgestellt. Fällt ein Knoten aus, wird automatisch umgeschaltet – du musst nichts überwachen.
+> Führe auf einem kleinen Server im Ausland **einen einzigen Befehl** aus: Er zieht automatisch Hunderte kostenlose Ausgänge aus öffentlichen Knotenquellen (VPNGate), misst deren Geschwindigkeit in Echtzeit, wählt intelligent die schnellste Route und stellt nach außen einen stabilen **SOCKS5- / HTTP-Proxy** bereit. Fällt ein Knoten aus, wird automatisch umgeschaltet — du musst nichts überwachen.
 
 <p>
-  <img alt="Ein-Klick-Bereitstellung" src="https://img.shields.io/badge/Bereitstellung-Ein%20Befehl-brightgreen">
-  <img alt="Go Einzelbinary" src="https://img.shields.io/badge/Go-Einzelbinary·ohne%20Abhängigkeiten-00ADD8">
-  <img alt="kostenlos" src="https://img.shields.io/badge/Knoten-kostenlos·automatischer%20Speedtest-orange">
+  <img alt="Bereitstellung mit einem Befehl" src="https://img.shields.io/badge/Bereitstellung-Ein%20Befehl-brightgreen">
+  <img alt="Go Einzelbinary" src="https://img.shields.io/badge/Go-Einzelbinary%C2%B7ohne%20Abh%C3%A4ngigkeiten-00ADD8">
+  <img alt="Kostenlos" src="https://img.shields.io/badge/Knoten-Kostenlos%C2%B7Auto-Speedtest-orange">
 </p>
 
 **Für wen ist das gedacht?**
 
-- Für alle, die einen **eigenen, kontrollierbaren** Proxy-Ausgang wollen, statt ihren Datenverkehr fremden Anbietern zu überlassen.
-- Für alle, die (bereits oder demnächst) einen ausländischen VPS besitzen und ihn in ein vollautomatisches Proxy-Gateway verwandeln möchten.
-- Für alle, die keine komplizierte Konfiguration möchten – **mit einem Befehl installiert, mit ein paar Klicks im Web startklar**.
+- Für alle, die einen **eigenen, kontrollierbaren** Proxy-Ausgang wollen, statt ihren Traffic einem fremden Anbieter zu überlassen.
+- Für alle, die einen VPS im Ausland haben (oder kaufen wollen) und ihn in ein voll automatisches Proxy-Gateway verwandeln möchten.
+- Für alle, die keine komplizierte Konfiguration wollen — **mit einem Befehl installiert, mit ein paar Klicks im Web einsatzbereit**.
 
 ---
 
-## ✨ Kernfunktionen
+## ✨ Kern-Highlights
 
-- 🔌 **Bereitstellung mit einem Befehl**: Abhängigkeiten, Dienst und Autostart werden vollautomatisch eingerichtet – auch für Einsteiger geeignet.
-- 🌍 **Automatische Erkennung + realer Speedtest**: Hunderte Knoten werden aus öffentlichen Quellen abgerufen, Erreichbarkeit und Latenz real gemessen und der schnellste automatisch ausgewählt.
-- ♻️ **Automatisches Umschalten bei Ausfall**: Kostenlose Knoten sind instabil? Im Hintergrund wird automatisch neu verbunden und umgeschaltet, sodass der Proxy dauerhaft online bleibt.
-- 🧩 **SOCKS5 / HTTP auf demselben Port**: Ein einziger Port `9527` für alles, das Protokoll wird anhand des ersten Bytes automatisch erkannt.
-- 🖥️ **Schlichtes Web-Backend**: Knotenpool, Gateway-Status, Logs und Strategien auf einen Blick.
-- 📦 **Einzeldatei ohne Abhängigkeiten**: Eine statische Binary mit eingebettetem Frontend und eingebetteter Datenbank – sofort einsatzbereit.
+- 🔌 **Bereitstellung mit einem Befehl**: Abhängigkeiten, Dienst und Autostart werden vollautomatisch erledigt — auch für Einsteiger geeignet.
+- 🌍 **Automatische Erkennung + echte Geschwindigkeitsmessung**: Zieht Hunderte Knoten aus öffentlichen Quellen, testet Konnektivität und Latenz real und wählt automatisch den schnellsten.
+- ♻️ **Automatische Umschaltung bei Ausfall**: Kostenlose Knoten instabil? Im Hintergrund wird automatisch neu verbunden und umgeschaltet, sodass der Proxy dauerhaft online bleibt.
+- 🧩 **SOCKS5 / HTTP auf demselben Port**: Ein einziger Port `9527` für alles, das Protokoll wird am ersten Byte automatisch erkannt.
+- 🖥️ **Übersichtliches Web-Backend**: Knotenpool, Gateway-Status, Logs und Strategien auf einen Blick.
+- 📦 **Eine Datei, keine Abhängigkeiten**: Ein statisches Binary mit eingebettetem Frontend und Datenbank — sofort lauffähig.
 
 ---
 
-## 🛒 Bevor du loslegst: diese beiden Dinge vorbereiten (Pflichtlektüre für Einsteiger)
+## 🛒 Bevor du beginnst: Diese zwei Dinge vorbereiten (Pflichtlektüre für Einsteiger)
 
-### 1️⃣ Ein ausländischer Linux-VPS (umgangssprachlich „kleiner Server")
+### 1️⃣ Ein Linux-VPS im Ausland (umgangssprachlich „kleiner Server")
 
-Dieses Tool muss auf einem **ausländischen Linux-Server** laufen (mit root, TUN-Unterstützung erforderlich). Für Einsteiger empfehlen sich die folgenden beiden Anbieter, die beide **Alipay** als Zahlungsmethode unterstützen und sofort startklar sind:
+Dieses Tool muss auf einem **Linux-Server im Ausland** laufen (root nötig, TUN-Unterstützung erforderlich). Einsteigern empfehlen wir die folgenden zwei Anbieter — beide akzeptieren **Alipay** und sind sofort einsatzbereit:
 
-| Empfehlung | Geeignet für | Merkmale | Link |
+| Empfehlung | Geeignet für | Merkmale | Zum Anbieter |
 |---|---|---|---|
-| **BandwagonHost (搬瓦工)** | 🔰 Einsteiger / Preis-Leistung | Etabliert und stabil, günstiger Preis, Alipay-Unterstützung, wählbare hochwertige CN2-GIA-Route, sofort einsatzbereit | **[Jetzt kaufen 👉](https://cutt.ly/qywJNWzd)** |
-| **DMIT** | 🚀 Für höchste Geschwindigkeit / High-End | Erstklassige Optimierung für alle drei Netze / CN2-GIA-Route, niedrige Latenz, hohe Geschwindigkeit, maximales Erlebnis | **[Jetzt kaufen 👉](https://cutt.ly/YywJIzY0)** |
+| **BandwagonHost (搬瓦工)** | 🔰 Einsteiger / Preis-Leistung | Etabliert und stabil, günstige Preise, Alipay-Unterstützung, optional hochwertige CN2-GIA-Routen, sofort einsatzbereit | **[Jetzt kaufen 👉](https://cutt.ly/qywJNWzd)** |
+| **DMIT** | 🚀 Für Geschwindigkeit / Premium | Erstklassige Optimierung für alle drei Netzbetreiber / CN2-GIA-Routen, geringe Latenz, hohe Geschwindigkeit, maximales Erlebnis | **[Jetzt kaufen 👉](https://cutt.ly/YywJIzY0)** |
 
-> 💡 Begrenztes Budget und unkompliziert → wähle **[BandwagonHost](https://cutt.ly/qywJNWzd)**; für maximale Geschwindigkeit und Routenqualität → wähle **[DMIT](https://cutt.ly/YywJIzY0)**.
-> Wähle als System bitte **Ubuntu / Debian** (dieses Tutorial verwendet diese als Beispiel) und als Paket KVM (unterstützt TUN standardmäßig).
+> 💡 Begrenztes Budget, unkompliziert → wähle **[BandwagonHost](https://cutt.ly/qywJNWzd)**; für maximale Geschwindigkeit und Routenqualität → wähle **[DMIT](https://cutt.ly/YywJIzY0)**.
+> Wähle als System **Ubuntu / Debian** (diese Anleitung verwendet sie als Beispiel) und als Paket KVM (unterstützt TUN standardmäßig).
 
-### 2️⃣ Eine „Karte", mit der du bezahlen kannst
+### 2️⃣ Eine zahlungsfähige „Karte"
 
-Die meisten ausländischen VPS erfordern eine Kreditkarte / PayPal. **Keine ausländische Kreditkarte?** Mit einer **virtuellen ausländischen Kreditkarte** eröffnest du in wenigen Minuten eine Karte und abonnierst mühelos allerlei ausländische Dienste (VPS, ChatGPT, Streaming, Abo-Software usw.):
+Die meisten ausländischen VPS benötigen eine Kreditkarte / PayPal. **Keine ausländische Kreditkarte?** Mit einer **ausländischen virtuellen Kreditkarte** ist in wenigen Minuten eine Karte eröffnet, mit der du problemlos verschiedenste ausländische Dienste abonnieren kannst (VPS, ChatGPT, Streaming, Abo-Software usw.):
 
-> 💳 **[Virtuelle ausländische Kreditkarte · Schnelleinstieg zur Kartenerstellung 👉](https://cutt.ly/IyrMR4Mg)**
+> 💳 **[Ausländische virtuelle Kreditkarte · Schnelle Karteneröffnung 👉](https://cutt.ly/IyrMR4Mg)**
 
 ---
 
-## ⚡ Bereitstellung in drei Schritten (die echte Einsteiger-Version)
+## ⚡ Bereitstellung in drei Schritten (echte Einsteiger-Version)
 
-Angenommen, du hast bereits einen VPS gekauft und die **Server-IP** sowie das **root-Passwort** erhalten.
+Angenommen, du hast deinen VPS bereits gekauft und die **Server-IP** sowie das **root-Passwort** erhalten.
 
 **Schritt 1 · Per SSH auf deinem VPS anmelden**
 
@@ -67,118 +67,117 @@ ssh root@你的服务器IP
 bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/install.sh)
 ```
 
-Das Skript erledigt automatisch: das Programm für die passende Architektur herunterladen → Systemabhängigkeiten (openvpn usw.) installieren → den Autostart-Dienst registrieren → starten. Warte einfach, bis es durchgelaufen ist – der gesamte Vorgang läuft ohne Interaktion.
+Das Skript erledigt automatisch: das passende Programm für deine Architektur herunterladen → Systemabhängigkeiten (openvpn usw.) installieren → den Autostart-Dienst registrieren → starten. Lass es einfach durchlaufen, es ist keinerlei Interaktion nötig.
 
-**Schritt 3 · Verwaltungs-URL sowie Benutzername und Passwort abrufen**
+**Schritt 3 · Verwaltungs-URL sowie Benutzername und Passwort notieren**
 
-```bash
-free-proxy credentials
-```
-
-Ausgegeben wird etwa:
+Am Ende gibt das Installationsskript den bei dieser Bereitstellung zufällig generierten Pfad, Benutzernamen und das Passwort **direkt aus**:
 
 ```text
-URL: http://127.0.0.1:8787/xxxxxxxxxxxx/
-Username: xxxxxxxx
-Password: xxxxxxxx
+URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+Username:  xxxxxxxx
+Password:  xxxxxxxx
 ```
 
-✅ **Fertig!** Der Dienst ruft im Hintergrund bereits automatisch Knoten ab, testet die Geschwindigkeit und stellt die Verbindung her. Als Nächstes sehen wir uns die Nutzung an.
+> 🔑 Pfad, Benutzername und Passwort werden **bei jeder Bereitstellung zufällig neu generiert**, es gibt keinerlei Standardwerte — bitte sofort speichern (das Passwort lässt sich nachträglich nicht wiederherstellen). Später kannst du sie auch mit `free-proxy credentials` erneut anzeigen.
+> ⚠️ Jede erneute Ausführung der Installation (also jedes Update) **rotiert** diese Zugangsdaten neu, die alten werden sofort ungültig.
+
+✅ **Fertig!** Der Dienst zieht bereits im Hintergrund automatisch Knoten, misst die Geschwindigkeit und stellt Verbindungen her. Schauen wir uns als Nächstes die Nutzung an.
 
 ---
 
 ## 🌐 So nutzt du den Proxy / greifst auf das Web-Backend zu
 
-Der Dienst lauscht standardmäßig auf `0.0.0.0` und bringt einen integrierten **„Externer-Zugriff"-Schalter** mit (jederzeit auf der Seite „Strategie" im Backend umschaltbar, **wirkt sofort, ohne Neustart**). Lokaler Zugriff und SSH-Tunnel sind **immer verfügbar** und vom Schalter unabhängig.
+Der Dienst lauscht standardmäßig auf `0.0.0.0` und verfügt über einen eingebauten **„Zugriff aus dem Internet"-Schalter** (jederzeit auf der Seite „Strategie" im Backend umschaltbar, **sofort wirksam, kein Neustart nötig**). Der lokale Zugriff und SSH-Tunnel sind **immer verfügbar** und vom Schalter unabhängig.
 
-### Web-Backend: externer Zugriff standardmäßig erlaubt ✅
+### Web-Backend: standardmäßig Zugriff aus dem Internet erlaubt ✅
 
-Durch die doppelte Absicherung mit Login + zufälligem Schlüsselpfad kannst du es direkt nach der Installation von außen öffnen. Rufe im Browser die von `free-proxy credentials` ausgegebene Adresse auf:
+Durch die doppelte Absicherung aus Login + zufälligem geheimen Pfad kannst du es nach der Installation direkt aus dem Internet öffnen. Rufe im Browser die von `free-proxy credentials` ausgegebene Adresse auf:
 
 ```text
 http://你的服务器IP:8787/<你的安全路径>/
 ```
 
-Falls kein öffentlicher Zugriff nötig ist, kannst du den Externer-Zugriff-Schalter im Backend deaktivieren oder stattdessen einen SSH-Tunnel verwenden (siehe unten).
+Falls du keinen öffentlichen Zugriff brauchst, kannst du im Backend dessen Internet-Schalter deaktivieren oder stattdessen einen SSH-Tunnel verwenden (siehe unten).
 
 ### Proxy-Port: standardmäßig nur lokal 🔒
 
-Um zu vermeiden, dass daraus ein für jedermann nutzbarer **„offener Proxy"** wird, bedient der Proxy standardmäßig nur den lokalen Rechner. Um ihn von außen zu nutzen, sind zwei Schritte nötig:
+Um zu vermeiden, dass er zu einem für jeden nutzbaren **„offenen Proxy"** wird, dient der Proxy standardmäßig nur dem lokalen Rechner. Um ihn aus dem Internet zu nutzen, sind zwei Schritte nötig:
 
-1. **Proxy-Passwort setzen**: Bearbeite `/etc/free-proxy/free-proxy.env`, füge die folgenden beiden Zeilen hinzu und führe anschließend `systemctl restart free-proxy` aus:
+1. **Proxy-Passwort setzen**: Bearbeite `/etc/free-proxy/free-proxy.env` und füge die folgenden zwei Zeilen hinzu, dann `systemctl restart free-proxy`:
    ```text
    FREE_PROXY_PROXY_USERNAME=自己设一个用户名
    FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
    ```
-2. **Im Backend aktivieren**: Gehe im Web-Backend zu „Strategie → Externer Zugriff", aktiviere „Externen Zugriff auf den Proxy-Port erlauben" und speichere.
+2. **Im Backend aktivieren**: Gehe ins Web-Backend zu „Strategie → Zugriff aus dem Internet", aktiviere „Zugriff auf den Proxy-Port aus dem Internet erlauben" und speichere.
 
-Danach kannst du ihn in Anwendungen auf deinem Rechner nutzen: `socks5://用户名:密码@你的服务器IP:9527`.
+Danach kannst du es in Anwendungen auf deinem Rechner verwenden: `socks5://用户名:密码@你的服务器IP:9527`.
 
-> 🔒 Die konservativste Nutzung (gar kein öffentlicher Zugriff): Deaktiviere im Backend den externen Zugriff auf das Web-Backend und verwende stattdessen einen SSH-Tunnel –
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`, und greife dann lokal über `127.0.0.1` zu.
+> 🔒 Die konservativste Nutzung (überhaupt kein öffentlicher Zugriff): Deaktiviere im Backend den Internet-Zugriff auf das Web-Backend und verwende stattdessen einen SSH-Tunnel —
+> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`, dann lokal `127.0.0.1` aufrufen.
 
 ### Prüfen, ob der Proxy funktioniert
 
 ```bash
-curl --proxy socks5h://127.0.0.1:9527 https://api.ipify.org   # Zurückgegeben werden sollte die "VPN-Ausgangs-IP", nicht die IP deines eigenen VPS
+curl --proxy socks5h://127.0.0.1:9527 https://api.ipify.org   # 返回的应是"VPN 出口 IP",而不是你 VPS 自己的 IP
 curl --proxy http://127.0.0.1:9527   https://api.ipify.org
 ```
 
-Wenn du eine andere IP als die deines VPS siehst, bedeutet das, dass der Proxy den Datenverkehr bereits über den VPN-Ausgang weiterleitet 🎉
+Wenn du eine IP siehst, die sich von der deines VPS unterscheidet, bedeutet das, dass der Proxy den Traffic bereits über den VPN-Ausgang weiterleitet 🎉
 
 ---
 
-## 🖱️ So nutzt du das Web-Backend
+## 🖱️ So bedienst du das Web-Backend
 
 1. Öffne die Verwaltungs-URL und melde dich mit Benutzername und Passwort an.
-2. Klicke auf **„Knoten aktualisieren und prüfen"** und warte kurz, bis das System Knoten erkennt, die Geschwindigkeit testet und sich automatisch mit dem schnellsten verbindet.
+2. Klicke auf **„Knoten aktualisieren und prüfen"** und warte kurz, bis er die Knoten erkennt, misst und automatisch mit dem schnellsten verbindet.
 3. Im Panel **„Gateway"** siehst du den aktuellen Ausgangsknoten, die Latenz und die Ausgangs-IP.
-4. Richte den Proxy deiner lokalen Anwendungen auf `127.0.0.1:9527` und du kannst loslegen.
+4. Richte den Proxy deiner lokalen Anwendungen auf `127.0.0.1:9527` und schon geht's los.
 
 ---
 
 ## 🔧 Häufige Befehle
 
 ```bash
-free-proxy credentials   # Verwaltungs-URL sowie Benutzername und Passwort anzeigen
-free-proxy status        # Betriebsstatus anzeigen
-free-proxy logs -n 100   # Die letzten Logs anzeigen
-free-proxy uninstall     # Deinstallieren (mit --purge-data werden auch die Daten gelöscht)
+free-proxy credentials   # 查看管理网址与账号密码
+free-proxy status        # 查看运行状态
+free-proxy logs -n 100   # 查看最近日志
+free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**Auf die neueste Version aktualisieren**: Führe einfach den obigen „Ein-Befehl-Installer" erneut aus – Konfiguration und Daten bleiben erhalten.
+**Auf die neueste Version aktualisieren**: Führe einfach den obigen „Installationsbefehl in einer Zeile" erneut aus. Knotendaten und Einstellungen bleiben erhalten; aber der **Verwaltungspfad, der Benutzername und das Passwort werden zufällig neu rotiert** (am Ende der Installation wird ein neuer Satz ausgegeben — bitte unbedingt speichern, die alten werden sofort ungültig).
 
 ---
 
 ## ❓ Häufige Fragen
 
 - **Keine Verbindung / vorübergehend keine Knoten?** Kostenlose Knoten (VPNGate) schwanken naturgemäß; der Dienst versucht es automatisch erneut und schaltet um. Warte etwas länger oder klicke im Backend einmal auf „Knoten aktualisieren und prüfen".
-- **Meldung, dass root / TUN benötigt wird?** Führe es bitte als root aus und stelle sicher, dass auf dem VPS TUN/TAP aktiviert ist. **[BandwagonHost](https://cutt.ly/qywJNWzd)** / **[DMIT](https://cutt.ly/YywJIzY0)** basieren beide auf KVM, unterstützen es standardmäßig und sind sofort einsatzbereit.
-- **Mein VPS hat eine ARM-Architektur?** Kein Problem, das Installationsskript erkennt amd64 / arm64 automatisch.
-- **Kann ich es auf meinem eigenen Rechner (macOS/Windows) laufen lassen?** Kompilieren und Entwickeln ist möglich, aber der reale Tunnel und der Ausgangs-Proxy erfordern Linux + root + TUN – bitte auf einem VPS bereitstellen.
+- **Meldung, dass root / TUN benötigt wird?** Führe es bitte als root aus und stelle sicher, dass der VPS TUN/TAP aktiviert hat. **[BandwagonHost](https://cutt.ly/qywJNWzd)** / **[DMIT](https://cutt.ly/YywJIzY0)** sind beide KVM-basiert, unterstützen es standardmäßig und sind sofort einsatzbereit.
+- **Mein VPS hat ARM-Architektur?** Kein Problem, das Installationsskript erkennt amd64 / arm64 automatisch.
+- **Kann ich es auf meinem eigenen Rechner (macOS/Windows) laufen lassen?** Kompilieren und Entwickeln ist möglich, aber der echte Tunnel und der Ausgangs-Proxy benötigen Linux + root + TUN — bitte auf einem VPS bereitstellen.
 
 ---
 
 ## 🧰 Empfohlene Tools und Ressourcen
 
-- 🔎 **Der beste Telegram-Suchbot** –– ein Wundertool zum Finden von Filmen, Software, E-Books und allerlei Ressourcen, sofort auffindbar: 👉 **[Hier öffnen](https://cutt.ly/2yeh3GOE)**
-- 🖥️ Noch keinen Server? **[BandwagonHost (Preis-Leistung für Einsteiger)](https://cutt.ly/qywJNWzd)** · **[DMIT (High-End-Route)](https://cutt.ly/YywJIzY0)**
-- 💳 Keine ausländische Karte zum Bezahlen? **[Virtuelle ausländische Kreditkarte](https://cutt.ly/IyrMR4Mg)**
+- 🔎 **Der beste Telegram-Suchbot** — das perfekte Werkzeug, um Filme, Software, E-Books und alle Arten von Ressourcen zu finden, sofortige Treffer: 👉 **[Hier öffnen](https://cutt.ly/2yeh3GOE)**
+- 🖥️ Noch keinen Server? **[BandwagonHost (Preis-Leistung für Einsteiger)](https://cutt.ly/qywJNWzd)** · **[DMIT (Premium-Routen)](https://cutt.ly/YywJIzY0)**
+- 💳 Keine ausländische Karte zum Bezahlen? **[Ausländische virtuelle Kreditkarte](https://cutt.ly/IyrMR4Mg)**
 
 ---
 
 ## 🛡️ Sicherheitsempfehlungen
 
-- Der Dienst lauscht standardmäßig auf `0.0.0.0`; die Freigabe nach außen wird über den „Externer-Zugriff"-Schalter im Backend gesteuert: **Das Web-Backend ist standardmäßig offen** (mit Login- und Schlüsselpfad-Schutz), **der Proxy standardmäßig nur lokal**. Wenn kein öffentlicher Zugriff nötig ist, kannst du im Backend den externen Zugriff auf das Web-Backend deaktivieren und stattdessen einen SSH-Tunnel verwenden.
-- **Bevor du den externen Zugriff auf den Proxy aktivierst, musst du zwingend Benutzername und Passwort für den Proxy setzen**, sonst wird daraus ein für jedermann nutzbarer „offener Proxy", der leicht missbraucht wird und dazu führen kann, dass dein VPS gesperrt wird; deshalb weist das System ohne gesetztes Passwort alle externen Proxy-Anfragen ab.
-- Ändere nach der ersten Anmeldung möglichst rasch Benutzername und Passwort des Verwaltungskontos. Tunnel, Policy-Routing und die Installation von Abhängigkeiten erfordern root – aktiviere sie nur auf Servern, die du selbst kontrollierst.
+- Der Dienst lauscht standardmäßig auf `0.0.0.0`; die Freigabe wird durch den „Zugriff aus dem Internet"-Schalter im Backend gesteuert: **Das Web-Backend ist standardmäßig offen** (mit Login- + geheimem-Pfad-Schutz), **der Proxy ist standardmäßig nur lokal**. Wenn du keinen öffentlichen Zugriff brauchst, kannst du im Backend den Internet-Zugriff auf das Web-Backend deaktivieren und stattdessen einen SSH-Tunnel verwenden.
+- **Bevor du den Internet-Zugriff auf den Proxy aktivierst, musst du zwingend einen Proxy-Benutzernamen und ein Passwort setzen**, sonst wird er zu einem für jeden nutzbaren „offenen Proxy", der leicht missbraucht wird und dazu führen kann, dass dein VPS gesperrt wird; deshalb weist das System bei nicht gesetztem Passwort alle Proxy-Anfragen aus dem Internet ab.
+- Ändere nach der ersten Anmeldung möglichst schnell Benutzername und Passwort des Verwaltungskontos. Tunnel, Policy-Routing und Abhängigkeitsinstallation benötigen root — aktiviere sie nur auf Servern, die du selbst kontrollierst.
 
 ---
 
 ## 🧑‍💻 Fortgeschrittene Nutzung (für Entwickler)
 
 <details>
-<summary>Zum Ausklappen anklicken: Kommandozeile / Konfigurationsoptionen / API / Build aus dem Quellcode / Release / Projektstruktur</summary>
+<summary>Zum Ausklappen klicken: Kommandozeile / Konfigurationsoptionen / API / Build aus dem Quellcode / Release / Projektstruktur</summary>
 
 ### Manuelle Installation (ohne Skript)
 
@@ -190,23 +189,23 @@ chmod +x free-proxy && sudo ./free-proxy install
 ### Vollständige CLI
 
 ```bash
-free-proxy serve                 # Konsole + Proxy-Gateway + Hintergrundaufgaben ausführen
-free-proxy install               # Ein-Klick-Installation: Binary + Abhängigkeiten + Umgebungsdatei + Dienst (erfordert root)
-free-proxy uninstall             # Dienst und Binary deinstallieren, --purge-data löscht zugleich die Daten (erfordert root)
-free-proxy credentials           # Verwaltungsadresse und Einmalpasswort ausgeben
-free-proxy discover              # Knoten abrufen und speichern
-free-proxy status                # Konfiguration und Datenbanktabellen ausgeben
-free-proxy preflight             # Umgebungsprüfung vor dem Start
-free-proxy doctor [--fix]        # Systemabhängigkeiten prüfen (und ggf. installieren)
-free-proxy install-deps          # Nur openvpn / iproute2 / procps installieren (erfordert root)
-free-proxy database-upgrade      # Datenbankmigration ausführen
-free-proxy admin-config ...      # Verwaltungs-Anmeldedaten und Listener ändern
-free-proxy logs --lines 200      # Die letzten Logs ausgeben
+free-proxy serve                 # 运行控制台 + 代理网关 + 后台任务
+free-proxy install               # 一键安装:二进制 + 依赖 + 环境文件 + 服务(需 root)
+free-proxy uninstall             # 卸载服务与二进制,--purge-data 同时删数据(需 root)
+free-proxy credentials           # 打印管理地址与一次性密码
+free-proxy discover              # 拉取并存储节点
+free-proxy status                # 打印配置与数据库表
+free-proxy preflight             # 启动前环境检查
+free-proxy doctor [--fix]        # 检查(并可安装)系统依赖
+free-proxy install-deps          # 仅安装 openvpn / iproute2 / procps(需 root)
+free-proxy database-upgrade      # 执行数据库迁移
+free-proxy admin-config ...      # 修改管理凭据与监听
+free-proxy logs --lines 200      # 打印最近日志
 ```
 
 ### Konfiguration
 
-Die Produktions-Konfigurationsdatei ist standardmäßig `/etc/free-proxy/free-proxy.env` (wird von `free-proxy install` erzeugt); Umgebungsvariablen tragen einheitlich das Präfix `FREE_PROXY_`. Alle Unterbefehle lesen diese Datei automatisch (Prozess-Umgebungsvariablen haben Vorrang; der Pfad lässt sich über `FREE_PROXY_ENV_FILE` überschreiben). Gebräuchliche Optionen:
+Die Konfigurationsdatei für die Produktionsumgebung ist standardmäßig `/etc/free-proxy/free-proxy.env` (von `free-proxy install` erzeugt), Umgebungsvariablen haben einheitlich das Präfix `FREE_PROXY_`. Alle Unterbefehle lesen diese Datei automatisch ein (Prozess-Umgebungsvariablen haben Vorrang; der Pfad kann mit `FREE_PROXY_ENV_FILE` überschrieben werden). Häufige Optionen:
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
@@ -221,9 +220,9 @@ FREE_PROXY_UPSTREAM_PROXY_URL=
 FREE_PROXY_DNS_REPAIR_ENABLED=false
 ```
 
-> Der Listener bindet fest an `0.0.0.0`; ob nach außen freigegeben wird, steuert der **„Externer-Zugriff"-Schalter im Backend** (Web-Backend standardmäßig an, Proxy standardmäßig aus), wirkt zur Laufzeit sofort, ohne Neustart. Das Setzen von `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` ist Voraussetzung, um den externen Zugriff auf den Proxy zu aktivieren.
+> Der Listener bindet fest an `0.0.0.0`; ob er nach außen offen ist, steuert der **„Zugriff aus dem Internet"-Schalter im Backend** (Web-Backend standardmäßig an, Proxy standardmäßig aus), zur Laufzeit sofort wirksam, kein Neustart nötig. Das Setzen von `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` ist die Voraussetzung, um den Internet-Zugriff auf den Proxy zu aktivieren.
 
-Bei schwach ausgestatteten Servern (z. B. 1 Kern / 1 GB) kannst du die Prüflast reduzieren:
+Bei schwach ausgestatteten kleinen Servern (z. B. 1 Kern / 1 GB) kannst du die Prüflast verringern:
 
 ```text
 FREE_PROXY_MAX_PROBE_CONCURRENCY=2
@@ -233,7 +232,7 @@ FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
 
 ### API-Übersicht
 
-Alle Endpunkte liegen unter dem sicheren Pfad-Präfix: `/{secret_path}/api/v1/...`. Langlaufende Operationen liefern `202 + Job` und werden über `GET /jobs/{id}` abgefragt.
+Alle Endpunkte liegen unter dem geheimen Pfad-Präfix: `/{secret_path}/api/v1/...`. Lang laufende Operationen geben `202 + Job` zurück und werden per `GET /jobs/{id}` abgefragt.
 
 ```text
 POST   /api/v1/auth/login        POST /api/v1/auth/logout
@@ -251,50 +250,50 @@ GET    /api/v1/logs              GET  /api/v1/logs/export
 ### Technologie-Stack
 
 - **Go 1.23+**, Echo v5 (Web/API), sqlc + `modernc.org/sqlite` (reines Go, ohne CGO), goose (eingebettete Migrationen), cobra (CLI), log/slog.
-- Frontend **React 19 + Vite + Tailwind v4 + Zustand**, das Build-Ergebnis wird per `//go:embed` in die Binary eingebettet.
-- Passwörter werden mit `scrypt` gehasht, Authentifizierung über zufälligen sicheren Pfad + Session-Cookie.
+- Frontend **React 19 + Vite + Tailwind v4 + Zustand**, das Build-Ergebnis wird per `//go:embed` ins Binary eingebettet.
+- Passwörter als `scrypt`-Hash, Authentifizierung über zufälligen geheimen Pfad + Session-Cookie.
 
 ### Aus dem Quellcode bauen
 
-Erforderlich sind Go 1.23+ und bun.
+Benötigt Go 1.23+ und bun.
 
 ```bash
-make build        # Frontend + statische Binary nach dist/free-proxy bauen
-make cross        # Cross-Compile für Linux amd64 / arm64
-make test         # Go-Tests ausführen
+make build        # 构建前端 + 静态二进制到 dist/free-proxy
+make cross        # 交叉编译 linux amd64 / arm64
+make test         # 运行 Go 测试
 ```
 
-Da kein CGO verwendet wird, lässt sich auf macOS direkt eine Linux-Binary erzeugen. Kopiere das lokale Build-Ergebnis auf den Zielrechner und führe `sudo ./free-proxy install` aus, um es bereitzustellen.
+Da kein CGO verwendet wird, kannst du unter macOS direkt Linux-Binaries erzeugen. Kopiere das lokal erstellte Build-Ergebnis auf die Zielmaschine und führe `sudo ./free-proxy install` aus, um es bereitzustellen.
 
 Hot-Reload für die Entwicklung:
 
 ```bash
-cd frontend && bun install && bun run dev   # Frontend-Hot-Reload (zusammen mit dem serve unten)
-go run ./cmd/free-proxy serve                # Backend (beim ersten Mal werden zufällige Verwaltungsadresse und Passwort erzeugt)
+cd frontend && bun install && bun run dev   # 前端热更新(配合下方 serve)
+go run ./cmd/free-proxy serve                # 后端(首次会生成随机管理地址与密码)
 ```
 
-### Ein Release veröffentlichen
+### Release veröffentlichen
 
-`install.sh` lädt `free-proxy-linux-{amd64,arm64}` aus den GitHub Releases; diese werden von `.github/workflows/release.yml` beim **Pushen eines Versions-Tags** automatisch gebaut und veröffentlicht:
+`install.sh` lädt `free-proxy-linux-{amd64,arm64}` aus den GitHub Releases herunter; sie werden von `.github/workflows/release.yml` beim **Pushen eines Versions-Tags** automatisch gebaut und veröffentlicht:
 
 ```bash
 git tag v1.0.0
-git push origin v1.0.0      # Löst die Action aus: Frontend bauen + Cross-Compile → Release veröffentlichen (inkl. SHA256SUMS)
+git push origin v1.0.0      # 触发 Action:构建前端 + 交叉编译 → 发布 Release(含 SHA256SUMS)
 ```
 
-Der Tag muss mit `v` beginnen. Nach abgeschlossener Veröffentlichung trifft der `latest`-Download von `install.sh` genau diese Binary.
+Das Tag muss mit `v` beginnen. Nach Abschluss der Veröffentlichung trifft der `latest`-Download von `install.sh` genau dieses Binary.
 
 ### Projektstruktur
 
 ```text
-cmd/free-proxy      # Einstiegspunkt + cobra-Unterbefehle + serve-Zusammenbau
+cmd/free-proxy      # 入口 + cobra 子命令 + serve 装配
 internal/
-  config domain logging security store        # Basisschicht
-  proxy tunnel netx providers ipinfo          # Proxy/Tunnel/Netzwerk/Datenquellen
-  services                                    # Use-Case-Services + Hintergrundüberwachung
-  api web                                     # Echo-Dienst + eingebettetes Frontend
-frontend/           # React-Quellcode (Build nach internal/web/dist)
-install.sh          # Bootstrap-Skript: Binary herunterladen und free-proxy install ausführen
+  config domain logging security store        # 基础层
+  proxy tunnel netx providers ipinfo          # 代理/隧道/网络/数据源
+  services                                    # 用例服务 + 后台监控
+  api web                                     # Echo 服务 + 内嵌前端
+frontend/           # React 源码(构建到 internal/web/dist)
+install.sh          # 引导脚本:下载二进制并执行 free-proxy install
 ```
 
 </details>
@@ -303,13 +302,13 @@ install.sh          # Bootstrap-Skript: Binary herunterladen und free-proxy inst
 
 ## 📄 Haftungsausschluss
 
-- Dieses Projekt dient ausschließlich dem Lernen, dem Austausch und **legalen Zwecken**; bitte halte dich an die Gesetze und Vorschriften deiner Region und verwende es keinesfalls für illegale Aktivitäten.
-- Die kostenlosen Knoten werden von Dritten (VPNGate) bereitgestellt; deren Verfügbarkeit und Sicherheit werden von diesem Projekt nicht garantiert – **übertrage bitte keine sensiblen Informationen über kostenlose Knoten**.
-- Die im Text genannten Links zu VPS, virtuellen Kreditkarten, Telegram-Bots usw. sind Werbe- / Empfehlungslinks (Affiliate); eine Bestellung über sie kann dem Autor eine kleine Provision einbringen, **verursacht dir jedoch keine zusätzlichen Kosten**. Danke für deine Unterstützung ❤️
+- Dieses Projekt dient ausschließlich dem Lernen, dem Austausch und **legalen Zwecken**. Bitte halte dich an die Gesetze und Vorschriften deiner Region und nutze es keinesfalls für illegale Aktivitäten.
+- Die kostenlosen Knoten werden von einem Dritten (VPNGate) bereitgestellt; ihre Verfügbarkeit und Sicherheit werden von diesem Projekt nicht garantiert. Bitte **übertrage keine sensiblen Informationen über kostenlose Knoten**.
+- Die im Text genannten VPS-, virtuellen Kreditkarten-, Telegram-Bot-Links usw. sind Werbe- / Empfehlungslinks (Affiliate). Bestellungen über sie können dem Autor eine kleine Provision einbringen, **ohne dass dir zusätzliche Kosten entstehen**. Danke für deine Unterstützung ❤️
 
 ## 🙏 Danksagung und Referenzen
 
-Dieses Projekt hat sich in Konzept und Umsetzung am Open-Source-Projekt **[aimili-vpngate](https://github.com/baoweise-bot/aimili-vpngate)** orientiert; ihm gilt ein besonderer Dank 🙏
+Dieses Projekt orientiert sich in Designideen und Umsetzung am Open-Source-Projekt **[aimili-vpngate](https://github.com/baoweise-bot/aimili-vpngate)**, wofür wir uns hiermit besonders bedanken 🙏
 
 ## License
 

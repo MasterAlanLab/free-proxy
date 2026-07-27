@@ -69,19 +69,18 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 脚本会自动:下载对应架构的程序 → 安装系统依赖(openvpn 等)→ 注册开机自启服务 → 启动。等它跑完即可,全程无需交互。
 
-**第 3 步 · 拿到管理网址和账号密码**
+**第 3 步 · 记下管理网址和账号密码**
 
-```bash
-free-proxy credentials
-```
-
-会打印类似:
+安装脚本跑完时会**直接打印**本次部署随机生成的路径、账号、密码:
 
 ```text
-URL: http://127.0.0.1:8787/xxxxxxxxxxxx/
-Username: xxxxxxxx
-Password: xxxxxxxx
+URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+Username:  xxxxxxxx
+Password:  xxxxxxxx
 ```
+
+> 🔑 路径、账号、密码都是**每次部署随机生成**的,没有任何默认值,请当场保存(密码事后无法找回)。之后也可以用 `free-proxy credentials` 再查看。
+> ⚠️ 每次重新运行安装(也就是更新)都会**重新轮换**这套凭据,旧的立即失效。
 
 ✅ **搞定!** 服务已经在后台自动抓节点、测速、连接了。接下来看看怎么用。
 
@@ -146,7 +145,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**更新到最新版**:重新执行一次上面的「一行命令安装」即可,配置和数据都会保留。
+**更新到最新版**:重新执行一次上面的「一行命令安装」即可。节点数据与设置会保留;但**管理路径、账号、密码会重新随机轮换**(安装结束时会打印新的一套,请注意保存,旧的立即失效)。
 
 ---
 

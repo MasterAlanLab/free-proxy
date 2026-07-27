@@ -69,19 +69,18 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 Lo script eseguirà automaticamente: download del programma per l'architettura corrispondente → installazione delle dipendenze di sistema (openvpn ecc.) → registrazione del servizio con avvio automatico → avvio. Basta attendere che finisca, senza alcuna interazione.
 
-**Passaggio 3 · Ottieni l'indirizzo di amministrazione e le credenziali**
+**Passaggio 3 · Prendi nota dell'indirizzo di amministrazione e delle credenziali**
 
-```bash
-free-proxy credentials
-```
-
-Verrà stampato qualcosa di simile:
+Al termine dell'esecuzione, lo script di installazione **stampa direttamente** il percorso, il nome utente e la password generati casualmente per questa distribuzione:
 
 ```text
-URL: http://127.0.0.1:8787/xxxxxxxxxxxx/
-Username: xxxxxxxx
-Password: xxxxxxxx
+URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+Username:  xxxxxxxx
+Password:  xxxxxxxx
 ```
+
+> 🔑 Percorso, nome utente e password vengono **generati casualmente a ogni distribuzione**, senza alcun valore predefinito: salvali subito (la password non è recuperabile in seguito). Puoi anche rivederli in seguito con `free-proxy credentials`.
+> ⚠️ Ogni volta che riesegui l'installazione (ovvero un aggiornamento), queste credenziali vengono **rigenerate**, e quelle vecchie scadono immediatamente.
 
 ✅ **Fatto!** Il servizio sta già recuperando nodi, testando la velocità e connettendosi automaticamente in background. Ora vediamo come usarlo.
 
@@ -146,7 +145,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**Aggiornare all'ultima versione**: basta rieseguire una volta il "comando di installazione" visto sopra; configurazione e dati verranno conservati.
+**Aggiornare all'ultima versione**: basta rieseguire una volta il «comando di installazione» visto sopra. I dati dei nodi e le impostazioni verranno conservati; ma **il percorso di amministrazione, il nome utente e la password verranno rigenerati casualmente** (al termine dell'installazione ne viene stampato un nuovo set, salvalo con attenzione, quello vecchio scade immediatamente).
 
 ---
 
