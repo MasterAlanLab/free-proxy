@@ -39,7 +39,7 @@ func FailureCode(lines []string) domain.TunnelFailureCode {
 		return domain.FailPermissionDenied
 	case anyOf("connection refused"):
 		return domain.FailConnectionRefused
-	case anyOf("options error", "fatal error", "unrecognized option", "option error"):
+	case hasFatalConfigError(lines):
 		return domain.FailConfigError
 	case anyOf("network is unreachable"):
 		return domain.FailUnreachable
@@ -48,6 +48,31 @@ func FailureCode(lines []string) domain.TunnelFailureCode {
 	default:
 		return domain.FailUnknown
 	}
+}
+
+// hasFatalConfigError reports whether the log contains a genuinely fatal
+// option/config error. It deliberately ignores the benign
+//
+//	Options error: option '<x>' cannot be used in this context ([PUSH-OPTIONS])
+//
+// warnings that every VPNGate node produces: with --route-nopull the client
+// intentionally rejects pushed dhcp-option/redirect-gateway directives, logs
+// this line, and proceeds to a successful handshake. Classifying those as fatal
+// (and therefore terminal) aborts every connection one step before completion.
+func hasFatalConfigError(lines []string) bool {
+	for _, ln := range lines {
+		l := strings.ToLower(ln)
+		if strings.Contains(l, "cannot be used in this context") {
+			continue // pushed option rejected by the client; non-fatal
+		}
+		if strings.Contains(l, "options error") ||
+			strings.Contains(l, "option error") ||
+			strings.Contains(l, "unrecognized option") ||
+			strings.Contains(l, "fatal error") {
+			return true
+		}
+	}
+	return false
 }
 
 // FailureMessage returns a human-readable message for the classified failure.

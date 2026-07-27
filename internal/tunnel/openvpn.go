@@ -83,6 +83,10 @@ func (m *Manager) Probe(ctx context.Context, configText, device string) domain.T
 
 // Connect brings up the active tunnel for a node, replacing any current one.
 func (m *Manager) Connect(ctx context.Context, nodeID, configText string) domain.TunnelStartResult {
+	// detectVersion acquires m.mu internally; resolve it BEFORE taking the lock
+	// here — sync.Mutex is not reentrant, so calling it while holding m.mu would
+	// self-deadlock (hanging the connect with no openvpn started).
+	version := m.detectVersion(ctx)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.disconnectLocked()
@@ -93,7 +97,6 @@ func (m *Manager) Connect(ctx context.Context, nodeID, configText string) domain
 	if err != nil {
 		return failResult(domain.FailStartFailed, "unable to write config: "+err.Error(), time.Now(), nil)
 	}
-	version := m.detectVersion(ctx)
 	upstream, upstreamAuth := m.upstreamOptions(configText)
 	args := BuildArgs(BuildParams{
 		Executable: ParseExecutable(m.cfg.OpenVPNCommand), ConfigFile: configPath, AuthFile: m.authFile,
