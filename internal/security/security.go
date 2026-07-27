@@ -160,6 +160,32 @@ func (s *AdminConfigStore) Update(c AdminConfig) error {
 	return nil
 }
 
+// Rotate regenerates the secret path, username, and password with fresh random
+// values, persists them, and records the new password as the one-time bootstrap
+// secret (so `credentials` can display it). Returns the updated config and the
+// new plaintext password. Called on every deployment so each install gets a
+// unique, unpredictable management path and admin credentials.
+func (s *AdminConfigStore) Rotate() (AdminConfig, string, error) {
+	password := RandomCredential(12)
+	hash, err := HashPassword(password)
+	if err != nil {
+		return AdminConfig{}, "", err
+	}
+	s.mu.Lock()
+	c := s.config
+	c.Username = RandomCredential(12)
+	c.PasswordHash = hash
+	c.SecretPath = RandomCredential(12)
+	if err := s.write(c); err != nil {
+		s.mu.Unlock()
+		return AdminConfig{}, "", err
+	}
+	s.config = c
+	s.mu.Unlock()
+	s.writeBootstrap(password)
+	return c, password, nil
+}
+
 // SetExternalAccess flips the network-exposure toggles at runtime (persisted +
 // in-memory) without touching credentials or the bootstrap password.
 func (s *AdminConfigStore) SetExternalAccess(web, proxy bool) error {

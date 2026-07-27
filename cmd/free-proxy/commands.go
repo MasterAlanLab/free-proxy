@@ -359,11 +359,33 @@ func installCmd() *cobra.Command {
 			if err := platform.WriteDefaultEnv(); err != nil {
 				return fmt.Errorf("write environment: %w", err)
 			}
+			// Every deployment gets a fresh, random management path + admin
+			// credentials — never a default or a value carried over from a
+			// previous install.
+			cfg, err := loadConfig()
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+			if err := cfg.EnsureDirectories(); err != nil {
+				return err
+			}
+			adminStore, err := security.NewAdminConfigStore(cfg)
+			if err != nil {
+				return fmt.Errorf("admin config: %w", err)
+			}
+			admin, password, err := adminStore.Rotate()
+			if err != nil {
+				return fmt.Errorf("rotate admin credentials: %w", err)
+			}
 			if err := platform.InstallService(ctx); err != nil {
 				return fmt.Errorf("install service: %w", err)
 			}
 			fmt.Fprintln(out, "Free Proxy installed and started.")
-			fmt.Fprintln(out, "Run `free-proxy credentials` to print the management URL and initial password.")
+			fmt.Fprintln(out, "This deployment generated a fresh random management path and admin login:")
+			fmt.Fprintf(out, "  URL:       http://<your-server-ip>:%d/%s/\n", admin.Port, admin.SecretPath)
+			fmt.Fprintf(out, "  Username:  %s\n", admin.Username)
+			fmt.Fprintf(out, "  Password:  %s\n", password)
+			fmt.Fprintln(out, "Save these now — re-running install rotates them and the password cannot be recovered later.")
 			return nil
 		},
 	}
