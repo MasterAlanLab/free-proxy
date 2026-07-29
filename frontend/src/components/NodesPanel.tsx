@@ -86,8 +86,9 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
             {busy === "发现节点" ? <Spinner /> : "仅发现"}
           </button>
           <button className="btn" disabled={!!busy || selected.size === 0}
-            onClick={() => runJob("探测选中", () => api.probeMany([...selected]))}>
-            探测选中（{selected.size}）
+            onClick={() => runJob("测试节点", () => api.probeMany([...selected]))}
+            title="测试节点是否能连接，并记录实际延迟">
+            测试节点（{selected.size}）
           </button>
         </>
       }
@@ -112,6 +113,9 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
         <button className="btn" onClick={load} disabled={loading}>{loading ? <Spinner /> : "刷新"}</button>
       </div>
 
+      <p className="text-xs text-ink-3 mb-3">
+        “切换节点”会立即使用该节点，并自动改为固定节点；“测试节点”只检查连接和延迟，不会切换当前节点。
+      </p>
       <div className="overflow-x-auto rounded-md border border-rule">
         <table className="w-full min-w-[880px] border-collapse">
           <thead>
@@ -123,12 +127,13 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
               <th className="th">状态</th>
               <th className="th">延迟</th>
               <th className="th">来源 Ping</th>
+              <th className="th">来源速度</th>
               <th className="th text-right">操作</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td className="td text-center text-ink-3 py-8" colSpan={8}>
+              <tr><td className="td text-center text-ink-3 py-8" colSpan={9}>
                 {loading ? "加载中…" : "暂无节点，点击“更新并检测节点”开始。"}
               </td></tr>
             )}
@@ -148,11 +153,18 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
                 <td className="td"><Badge label={statusLabel(n.status)} tone={n.status} /></td>
                 <td className="td tabular-nums">{n.latency_ms > 0 ? `${n.latency_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_ping_ms > 0 ? `${n.source_ping_ms} ms` : "—"}</td>
+                <td className="td tabular-nums text-ink-3">{formatSpeed(n.source_speed_bps)}</td>
                 <td className="td text-right whitespace-nowrap">
                   <button className="btn btn-sm btn-primary mr-1" disabled={!!busy}
-                    onClick={() => runJob("激活", () => api.activate(n.id))}>激活</button>
+                    onClick={() => runJob("切换节点", () => api.activate(n.id))}
+                    title="切换到此节点，并锁定为固定节点">
+                    切换节点
+                  </button>
                   <button className="btn btn-sm mr-1" disabled={!!busy}
-                    onClick={() => runJob("探测", () => api.probeOne(n.id))}>探测</button>
+                    onClick={() => runJob("测试节点", () => api.probeOne(n.id))}
+                    title="测试此节点是否能连接，并记录实际延迟">
+                    测试节点
+                  </button>
                   <button className="btn btn-sm mr-1" onClick={() => favorite(n.id)}>
                     {favorites.has(n.id) ? "★" : "☆"}
                   </button>
@@ -179,5 +191,12 @@ function ipLabel(t: string) {
   return { residential: "住宅", mobile: "移动", hosting: "机房", unknown: "未知" }[t] ?? t;
 }
 function statusLabel(s: string) {
-  return { ready: "可用", discovered: "已发现", probing: "探测中", unavailable: "不可用", cooldown: "冷却" }[s] ?? s;
+  return { ready: "可用", discovered: "已发现", probing: "测试中", unavailable: "不可用", cooldown: "冷却" }[s] ?? s;
+}
+
+function formatSpeed(bps: number) {
+  if (!bps || bps <= 0) return "—";
+  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
+  if (bps >= 1_000) return `${Math.round(bps / 1_000)} Kbps`;
+  return `${bps} bps`;
 }

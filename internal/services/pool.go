@@ -134,7 +134,26 @@ func effLatency(n domain.ProxyNodeRead) int {
 	return 999999
 }
 
+func effSpeed(n domain.ProxyNodeRead) int64 {
+	if n.SourceSpeedBPS > 0 {
+		return n.SourceSpeedBPS
+	}
+	return -1
+}
+
 func lessFor(a, b domain.ProxyNodeRead, settings domain.ProxySettings) bool {
+	if settings.RoutingMode == domain.PolicySpeedFirst {
+		if sa, sb := effSpeed(a), effSpeed(b); sa != sb {
+			return sa > sb
+		}
+		if la, lb := effLatency(a), effLatency(b); la != lb {
+			return la < lb
+		}
+		if a.SourceScore != b.SourceScore {
+			return a.SourceScore > b.SourceScore
+		}
+		return residentialRank(a) < residentialRank(b)
+	}
 	if settings.RoutingMode == domain.PolicyResidentialFirst {
 		if ra, rb := residentialRank(a), residentialRank(b); ra != rb {
 			return ra < rb

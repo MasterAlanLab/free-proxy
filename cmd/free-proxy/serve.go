@@ -63,7 +63,7 @@ func buildDeps(ctx context.Context, cfg *config.Config, db *sql.DB, auth *securi
 
 	healthChecker := netx.NewHealthChecker(adminCfg.ProxyHost, adminCfg.ProxyPort, cfg.ProxyUsername, cfg.ProxyPassword, cfg.ProxyConnectTimeout())
 	health := services.NewHealthService(cfg, healthChecker, repos.Nodes, repos.Settings, gateway, autoSwitch)
-	settingsSvc := services.NewSettingsService(repos.Nodes, repos.Settings, pool, gateway, autoSwitch)
+	settingsSvc := services.NewSettingsService(repos.Nodes, repos.Settings, pool, gateway, autoSwitch, coordinator)
 
 	tunAlloc, _ := netx.NewTunAllocator(cfg.TestTunStart, cfg.TestTunEnd)
 	probe := services.NewProbeService(cfg, repos.Nodes, tunnelMgr, tunAlloc, runner, ipInfo, repos.Probes, coordinator)

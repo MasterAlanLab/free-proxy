@@ -16,11 +16,52 @@ type SettingsService struct {
 	pool         *ProxyPoolService
 	gateway      *GatewayService
 	autoSwitch   *AutoSwitchService
+	coordinator  *Coordinator
 }
 
 // NewSettingsService constructs a SettingsService.
-func NewSettingsService(nodes *store.NodeRepository, settingsRepo *store.SettingsRepository, pool *ProxyPoolService, gateway *GatewayService, autoSwitch *AutoSwitchService) *SettingsService {
-	return &SettingsService{nodes: nodes, settingsRepo: settingsRepo, pool: pool, gateway: gateway, autoSwitch: autoSwitch}
+func NewSettingsService(nodes *store.NodeRepository, settingsRepo *store.SettingsRepository, pool *ProxyPoolService, gateway *GatewayService, autoSwitch *AutoSwitchService, coordinators ...*Coordinator) *SettingsService {
+	var coordinator *Coordinator
+	if len(coordinators) > 0 {
+		coordinator = coordinators[0]
+	}
+	return &SettingsService{nodes: nodes, settingsRepo: settingsRepo, pool: pool, gateway: gateway, autoSwitch: autoSwitch, coordinator: coordinator}
+}
+
+// SwitchNodeJob changes the active node manually and pins it as the fixed node.
+// Pinning is intentional: a user-selected node must not be replaced by the
+// automatic policy on the next health or maintenance cycle.
+func (s *SettingsService) SwitchNodeJob(nodeID string) JobFunc {
+	return func(ctx context.Context) (map[string]any, error) {
+		var result domain.TunnelStartResult
+		switchNode := func(ctx context.Context) error {
+			if _, err := s.nodes.Get(ctx, nodeID); err != nil {
+				return err
+			}
+			fixedID := nodeID
+			if err := s.settingsRepo.Update(ctx, domain.ProxySettingsUpdate{
+				// A manual choice is an explicit override of the previous filters;
+				// otherwise selecting (for example) a hosting node while the old
+				// policy was residential would fail validation before it could pin.
+				RoutingMode: domain.PolicyFixed, RoutingIPType: domain.RoutingAll,
+				ConnectionEnabled: true, FixedNodeID: &fixedID,
+			}); err != nil {
+				return err
+			}
+			s.gateway.SetConnectionEnabled(true)
+			var activateErr error
+			result, activateErr = s.gateway.Activate(ctx, nodeID)
+			return activateErr
+		}
+		if s.coordinator != nil {
+			if err := s.coordinator.Run(ctx, "switch-node", false, switchNode); err != nil {
+				return nil, err
+			}
+		} else if err := switchNode(ctx); err != nil {
+			return nil, err
+		}
+		return toMap(result)
+	}
 }
 
 // Get returns the current settings.

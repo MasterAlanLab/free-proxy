@@ -67,7 +67,8 @@ export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings
             <span className="text-sm text-ink-2">路由模式</span>
             <select className="field mt-1" value={form.routing_mode}
               onChange={(e) => set({ routing_mode: e.target.value as PolicyMode })}>
-              <option value="auto">自动（延迟优先）</option>
+              <option value="auto">延迟优先</option>
+              <option value="speed_first">速度优先</option>
               <option value="residential_first">住宅优先</option>
               <option value="country">指定国家</option>
               <option value="fixed">固定节点</option>
@@ -104,6 +105,7 @@ export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings
           </label>
         </div>
         <p className="text-xs text-ink-3 mt-4">
+          延迟优先选择响应最快的节点；速度优先选择来源标注带宽最高的节点。手动切换节点后会自动锁定为固定节点，避免后台自动切回其他节点。
           收藏节点数：{form.favorite_node_ids.length}。修改策略后系统会自动校验当前出口是否仍符合规则。
         </p>
       </Card>

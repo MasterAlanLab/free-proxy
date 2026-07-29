@@ -65,3 +65,14 @@ func TestSortCandidatesResidentialFirst(t *testing.T) {
 		t.Fatalf("residential_first should rank residential above faster hosting, got %s", nodes[0].ID)
 	}
 }
+
+func TestSortCandidatesSpeedFirst(t *testing.T) {
+	nodes := []domain.ProxyNodeRead{
+		{ID: "slow", LatencyMS: 10, SourceSpeedBPS: 1000},
+		{ID: "fast", LatencyMS: 100, SourceSpeedBPS: 9000},
+	}
+	SortCandidates(nodes, domain.ProxySettings{RoutingMode: domain.PolicySpeedFirst})
+	if nodes[0].ID != "fast" {
+		t.Fatalf("speed_first should pick highest advertised speed first, got %s", nodes[0].ID)
+	}
+}

@@ -196,7 +196,7 @@ func (h *Handlers) ProbeHistory(c *echo.Context) error {
 }
 
 func (h *Handlers) ActivateProxy(c *echo.Context) error {
-	job, err := h.Deps.Jobs.Submit(c.Request().Context(), "activate-proxy", h.Deps.Gateway.ActivateJob(c.Param("id")))
+	job, err := h.Deps.Jobs.Submit(c.Request().Context(), "switch-node", h.Deps.Settings.SwitchNodeJob(c.Param("id")))
 	if err != nil {
 		return err
 	}
@@ -362,8 +362,8 @@ func (h *Handlers) SystemStatus(c *echo.Context) error {
 			"socks5": gw.SocksListener,
 			"http":   gw.HTTPListener,
 		},
-		"monitors":         running,
-		"monitor_details":  monitors,
+		"monitors":          running,
+		"monitor_details":   monitors,
 		"network_operation": map[string]any{"operation": nullString(op), "waiting": waiting},
 	})
 }

@@ -44,7 +44,10 @@ const (
 type ProxyPolicyMode string
 
 const (
-	PolicyAuto             ProxyPolicyMode = "auto"
+	PolicyAuto ProxyPolicyMode = "auto"
+	// PolicySpeedFirst prefers nodes with the highest advertised throughput.
+	// PolicyAuto remains the latency-first mode for backward compatibility.
+	PolicySpeedFirst       ProxyPolicyMode = "speed_first"
 	PolicyResidentialFirst ProxyPolicyMode = "residential_first"
 	PolicyCountry          ProxyPolicyMode = "country"
 	PolicyFixed            ProxyPolicyMode = "fixed"
@@ -72,16 +75,16 @@ const (
 type TunnelFailureCode string
 
 const (
-	FailCommandNotFound  TunnelFailureCode = "command_not_found"
-	FailStartFailed      TunnelFailureCode = "start_failed"
-	FailTunUnavailable   TunnelFailureCode = "tun_unavailable"
-	FailAuthFailed       TunnelFailureCode = "auth_failed"
-	FailDNSFailed        TunnelFailureCode = "dns_failed"
-	FailTLSFailed        TunnelFailureCode = "tls_failed"
-	FailUnreachable      TunnelFailureCode = "unreachable"
-	FailPermissionDenied TunnelFailureCode = "permission_denied"
-	FailConfigError      TunnelFailureCode = "config_error"
+	FailCommandNotFound   TunnelFailureCode = "command_not_found"
+	FailStartFailed       TunnelFailureCode = "start_failed"
+	FailTunUnavailable    TunnelFailureCode = "tun_unavailable"
+	FailAuthFailed        TunnelFailureCode = "auth_failed"
+	FailDNSFailed         TunnelFailureCode = "dns_failed"
+	FailTLSFailed         TunnelFailureCode = "tls_failed"
+	FailUnreachable       TunnelFailureCode = "unreachable"
+	FailPermissionDenied  TunnelFailureCode = "permission_denied"
+	FailConfigError       TunnelFailureCode = "config_error"
 	FailConnectionRefused TunnelFailureCode = "connection_refused"
-	FailTimeout          TunnelFailureCode = "timeout"
-	FailUnknown          TunnelFailureCode = "unknown"
+	FailTimeout           TunnelFailureCode = "timeout"
+	FailUnknown           TunnelFailureCode = "unknown"
 )

@@ -80,7 +80,7 @@ func (m *MaintenanceService) run(ctx context.Context) (domain.MaintenanceResult,
 			return domain.MaintenanceResult{}, err
 		}
 		candidates = ApplyFilters(candidates, settings, true)
-		sort.SliceStable(candidates, func(i, j int) bool { return probeLess(candidates[i], candidates[j]) })
+		sort.SliceStable(candidates, func(i, j int) bool { return probeLess(candidates[i], candidates[j], settings) })
 		limit := m.cfg.InitialConnectTestLimit
 		if limit > len(candidates) {
 			limit = len(candidates)
@@ -171,7 +171,12 @@ func anyAvailable(results []domain.ProbeResult) bool {
 	return false
 }
 
-func probeLess(a, b domain.ProxyNodeRead) bool {
+func probeLess(a, b domain.ProxyNodeRead, settings domain.ProxySettings) bool {
+	if settings.RoutingMode == domain.PolicySpeedFirst {
+		if a.SourceSpeedBPS != b.SourceSpeedBPS {
+			return a.SourceSpeedBPS > b.SourceSpeedBPS
+		}
+	}
 	pa, pb := a.SourcePingMS, b.SourcePingMS
 	if pa == 0 {
 		pa = 999999
