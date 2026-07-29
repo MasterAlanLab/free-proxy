@@ -117,7 +117,7 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
         “切换节点”会立即使用该节点，并自动改为固定节点；“测试节点”只检查连接和延迟，不会切换当前节点。
       </p>
       <div className="overflow-x-auto rounded-md border border-rule">
-        <table className="w-full min-w-[880px] border-collapse">
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr>
               <th className="th w-8"></th>
@@ -128,12 +128,13 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
               <th className="th">延迟</th>
               <th className="th">来源 Ping</th>
               <th className="th">来源速度</th>
+              <th className="th" title="VPN Gate 最近一次抓取时的会话数，越少表示节点负载越低">会话数</th>
               <th className="th text-right">操作</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td className="td text-center text-ink-3 py-8" colSpan={9}>
+              <tr><td className="td text-center text-ink-3 py-8" colSpan={10}>
                 {loading ? "加载中…" : "暂无节点，点击“更新并检测节点”开始。"}
               </td></tr>
             )}
@@ -154,6 +155,7 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
                 <td className="td tabular-nums">{n.latency_ms > 0 ? `${n.latency_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_ping_ms > 0 ? `${n.source_ping_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{formatSpeed(n.source_speed_bps)}</td>
+                <td className="td tabular-nums text-ink-3">{n.source_sessions}</td>
                 <td className="td text-right whitespace-nowrap">
                   <button className="btn btn-sm btn-primary mr-1" disabled={!!busy}
                     onClick={() => runJob("切换节点", () => api.activate(n.id))}

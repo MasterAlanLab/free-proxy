@@ -1,6 +1,6 @@
 export type IpType = "residential" | "mobile" | "hosting" | "unknown";
 export type NodeStatus = "discovered" | "probing" | "ready" | "unavailable" | "cooldown";
-export type PolicyMode = "auto" | "speed_first" | "residential_first" | "country" | "fixed" | "favorites";
+export type PolicyMode = "auto" | "speed_first" | "smart" | "residential_first" | "country" | "fixed" | "favorites";
 export type RoutingIpType = "all" | "residential" | "hosting";
 
 export interface AccessConfig {
@@ -27,6 +27,7 @@ export interface ProxyNode {
   source_score: number;
   source_ping_ms: number;
   source_speed_bps: number;
+  source_sessions: number;
   latency_ms: number;
   success_count: number;
   failure_count: number;

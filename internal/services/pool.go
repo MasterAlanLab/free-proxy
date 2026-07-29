@@ -115,9 +115,75 @@ func ApplyFilters(nodes []domain.ProxyNodeRead, settings domain.ProxySettings, i
 
 // SortCandidates orders nodes by the effective selection key for settings.
 func SortCandidates(nodes []domain.ProxyNodeRead, settings domain.ProxySettings) {
+	if settings.RoutingMode == domain.PolicySmart {
+		sortSmartCandidates(nodes, false)
+		return
+	}
 	sort.SliceStable(nodes, func(i, j int) bool {
 		return lessFor(nodes[i], nodes[j], settings)
 	})
+}
+
+// sortSmartCandidates ranks the pool using relative scores so latency,
+// advertised speed, and VPN Gate session count contribute without their raw
+// units overwhelming one another. Latency and speed carry 40% each; lower
+// session count carries the remaining 20%.
+func sortSmartCandidates(nodes []domain.ProxyNodeRead, sourceLatency bool) {
+	if len(nodes) < 2 {
+		return
+	}
+	latencies := make([]float64, len(nodes))
+	speeds := make([]float64, len(nodes))
+	sessions := make([]float64, len(nodes))
+	for i, n := range nodes {
+		latencies[i] = smartLatency(n, sourceLatency)
+		speeds[i] = float64(effSpeed(n))
+		sessions[i] = float64(n.SourceSessions)
+	}
+	minMax := func(values []float64) (float64, float64) {
+		min, max := values[0], values[0]
+		for _, value := range values[1:] {
+			if value < min {
+				min = value
+			}
+			if value > max {
+				max = value
+			}
+		}
+		return min, max
+	}
+	latMin, latMax := minMax(latencies)
+	speedMin, speedMax := minMax(speeds)
+	sessionsMin, sessionsMax := minMax(sessions)
+	normalize := func(value, min, max float64) float64 {
+		if max == min {
+			return 0.5
+		}
+		return (value - min) / (max - min)
+	}
+	scores := make(map[string]float64, len(nodes))
+	for i, n := range nodes {
+		latencyScore := 1 - normalize(latencies[i], latMin, latMax)
+		speedScore := normalize(speeds[i], speedMin, speedMax)
+		sessionScore := 1 - normalize(sessions[i], sessionsMin, sessionsMax)
+		scores[n.ID] = 0.4*latencyScore + 0.4*speedScore + 0.2*sessionScore
+	}
+	sort.SliceStable(nodes, func(i, j int) bool {
+		if scores[nodes[i].ID] != scores[nodes[j].ID] {
+			return scores[nodes[i].ID] > scores[nodes[j].ID]
+		}
+		return nodes[i].ID < nodes[j].ID
+	})
+}
+
+func smartLatency(n domain.ProxyNodeRead, sourceLatency bool) float64 {
+	if n.LatencyMS > 0 {
+		return float64(n.LatencyMS)
+	}
+	if sourceLatency && n.SourcePingMS > 0 {
+		return float64(n.SourcePingMS)
+	}
+	return 999999
 }
 
 func residentialRank(n domain.ProxyNodeRead) int {

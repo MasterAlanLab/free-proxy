@@ -76,3 +76,15 @@ func TestSortCandidatesSpeedFirst(t *testing.T) {
 		t.Fatalf("speed_first should pick highest advertised speed first, got %s", nodes[0].ID)
 	}
 }
+
+func TestSortCandidatesSmart(t *testing.T) {
+	nodes := []domain.ProxyNodeRead{
+		{ID: "balanced", LatencyMS: 20, SourceSpeedBPS: 8000, SourceSessions: 2},
+		{ID: "busy", LatencyMS: 10, SourceSpeedBPS: 9000, SourceSessions: 80},
+		{ID: "slow", LatencyMS: 100, SourceSpeedBPS: 1000, SourceSessions: 1},
+	}
+	SortCandidates(nodes, domain.ProxySettings{RoutingMode: domain.PolicySmart})
+	if nodes[0].ID != "balanced" {
+		t.Fatalf("smart policy should balance latency, speed, and sessions, got %s", nodes[0].ID)
+	}
+}

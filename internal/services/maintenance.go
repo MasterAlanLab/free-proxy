@@ -80,7 +80,11 @@ func (m *MaintenanceService) run(ctx context.Context) (domain.MaintenanceResult,
 			return domain.MaintenanceResult{}, err
 		}
 		candidates = ApplyFilters(candidates, settings, true)
-		sort.SliceStable(candidates, func(i, j int) bool { return probeLess(candidates[i], candidates[j], settings) })
+		if settings.RoutingMode == domain.PolicySmart {
+			sortSmartCandidates(candidates, true)
+		} else {
+			sort.SliceStable(candidates, func(i, j int) bool { return probeLess(candidates[i], candidates[j], settings) })
+		}
 		limit := m.cfg.InitialConnectTestLimit
 		if limit > len(candidates) {
 			limit = len(candidates)

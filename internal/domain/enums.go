@@ -48,6 +48,7 @@ const (
 	// PolicySpeedFirst prefers nodes with the highest advertised throughput.
 	// PolicyAuto remains the latency-first mode for backward compatibility.
 	PolicySpeedFirst       ProxyPolicyMode = "speed_first"
+	PolicySmart            ProxyPolicyMode = "smart"
 	PolicyResidentialFirst ProxyPolicyMode = "residential_first"
 	PolicyCountry          ProxyPolicyMode = "country"
 	PolicyFixed            ProxyPolicyMode = "fixed"
