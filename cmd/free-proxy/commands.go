@@ -21,10 +21,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The command bodies are filled in across the refactor phases (see
-// docs/refactor-go.md). At P0 they parse config and report pending status so the
-// binary builds and `--help` works end to end.
-
 func serveCmd() *cobra.Command {
 	var host string
 	var port int

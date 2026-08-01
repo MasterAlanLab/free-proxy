@@ -136,10 +136,12 @@ curl --proxy http://127.0.0.1:9527   https://api.ipify.org
 
 ```bash
 free-proxy credentials   # 查看管理网址与账号密码
-free-proxy status        # 查看运行状态
-free-proxy logs -n 100   # 查看最近日志
+free-proxy status        # 查看配置和数据库状态
+free-proxy logs --lines 100  # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
+
+所有子命令、参数、输出和使用示例见 **[命令行使用指南](docs/cli.md)**。
 
 **更新到最新版**:重新执行一次上面的「一行命令安装」即可。节点数据、设置、管理路径、账号和密码都会保留不变。
 
@@ -184,20 +186,7 @@ chmod +x free-proxy && sudo ./free-proxy install
 
 ### 完整 CLI
 
-```bash
-free-proxy serve                 # 运行控制台 + 代理网关 + 后台任务
-free-proxy install               # 一键安装:二进制 + 依赖 + 环境文件 + 服务(需 root)
-free-proxy uninstall             # 卸载服务与二进制,--purge-data 同时删数据(需 root)
-free-proxy credentials           # 打印管理地址与一次性密码
-free-proxy discover              # 拉取并存储节点
-free-proxy status                # 打印配置与数据库表
-free-proxy preflight             # 启动前环境检查
-free-proxy doctor [--fix]        # 检查(并可安装)系统依赖
-free-proxy install-deps          # 仅安装 openvpn / iproute2 / procps(需 root)
-free-proxy database-upgrade      # 执行数据库迁移
-free-proxy admin-config ...      # 修改管理凭据与监听
-free-proxy logs --lines 200      # 打印最近日志
-```
+完整的命令和参数说明已整理到 **[命令行使用指南](docs/cli.md)**，其中包含权限要求、输出说明、配置加载规则、Shell 自动补全和常用示例。
 
 ### 配置
 
