@@ -94,8 +94,9 @@ func (h *Handlers) UpdateCredentials(c *echo.Context) error {
 	updated := security.AdminConfig{
 		Username: req.Username, PasswordHash: hash, SecretPath: req.SecretPath,
 		Host: req.Host, Port: req.Port,
-		ProxyHost: firstNonEmpty(req.ProxyHost, prev.ProxyHost),
-		ProxyPort: firstNonZero(req.ProxyPort, prev.ProxyPort),
+		ProxyHost:         firstNonEmpty(req.ProxyHost, prev.ProxyHost),
+		ProxyPort:         firstNonZero(req.ProxyPort, prev.ProxyPort),
+		WebExternalAccess: prev.WebExternalAccess, ProxyExternalAccess: prev.ProxyExternalAccess,
 	}
 	if err := h.Deps.Auth.Store.Update(updated); err != nil {
 		return err
@@ -313,10 +314,14 @@ type accessUpdate struct {
 // (external proxy access only takes effect once a proxy password is configured).
 func (h *Handlers) GetAccess(c *echo.Context) error {
 	cfg := h.Deps.Auth.Store.Config()
+	settings, err := h.Deps.Repos.App.Get(c.Request().Context())
+	if err != nil {
+		return err
+	}
 	return c.JSON(http.StatusOK, map[string]any{
 		"web_external_access":   cfg.WebExternalAllowed(),
 		"proxy_external_access": cfg.ProxyExternalAllowed(),
-		"proxy_auth_configured": h.Deps.Cfg.ProxyAuthEnabled(),
+		"proxy_auth_configured": settings.Proxy.PasswordSet,
 	})
 }
 
@@ -329,11 +334,122 @@ func (h *Handlers) UpdateAccess(c *echo.Context) error {
 	if err := h.Deps.Auth.Store.SetExternalAccess(req.WebExternalAccess, req.ProxyExternalAccess); err != nil {
 		return err
 	}
+	settings, err := h.Deps.Repos.App.Get(c.Request().Context())
+	if err != nil {
+		return err
+	}
 	return c.JSON(http.StatusOK, map[string]any{
 		"web_external_access":   req.WebExternalAccess,
 		"proxy_external_access": req.ProxyExternalAccess,
-		"proxy_auth_configured": h.Deps.Cfg.ProxyAuthEnabled(),
+		"proxy_auth_configured": settings.Proxy.PasswordSet,
 	})
+}
+
+type systemConfigUpdate struct {
+	Settings      domain.AppSettings `json:"settings"`
+	AdminPassword string             `json:"admin_password"`
+	ProxyPassword string             `json:"proxy_password"`
+}
+
+// GetSystemConfig returns every database-backed operational setting. Password
+// hashes are omitted; password_set indicates whether a credential exists.
+func (h *Handlers) GetSystemConfig(c *echo.Context) error {
+	settings, err := h.Deps.Repos.App.Get(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, settings)
+}
+
+// UpdateSystemConfig atomically saves the web-managed configuration. Runtime
+// services restart shortly afterwards so every component sees one snapshot.
+func (h *Handlers) UpdateSystemConfig(c *echo.Context) error {
+	var req systemConfigUpdate
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	s := req.Settings
+	if err := validateSystemConfig(s); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	prev, err := h.Deps.Repos.App.Get(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	s.Admin.PasswordHash = prev.Admin.PasswordHash
+	s.Proxy.PasswordHash = prev.Proxy.PasswordHash
+	if req.AdminPassword != "" {
+		s.Admin.PasswordHash, err = security.HashPassword(req.AdminPassword)
+		if err != nil {
+			return err
+		}
+	}
+	if req.ProxyPassword != "" {
+		s.Proxy.PasswordHash, err = security.HashPassword(req.ProxyPassword)
+		if err != nil {
+			return err
+		}
+	}
+	if s.Proxy.ExternalAccess && (s.Proxy.Username == "" || s.Proxy.PasswordHash == "") {
+		return echo.NewHTTPError(http.StatusBadRequest, "开启代理外网访问前需设置代理用户名和密码")
+	}
+	if err := h.Deps.Repos.App.UpdateAll(c.Request().Context(), s); err != nil {
+		return err
+	}
+	web, proxyExternal := s.Admin.WebExternalAccess, s.Proxy.ExternalAccess
+	admin := security.AdminConfig{
+		Username: s.Admin.Username, PasswordHash: s.Admin.PasswordHash, SecretPath: s.Admin.SecretPath,
+		Host: "0.0.0.0", Port: s.Admin.WebPort, ProxyHost: "0.0.0.0", ProxyPort: s.Proxy.Port,
+		WebExternalAccess: &web, ProxyExternalAccess: &proxyExternal,
+	}
+	if err := h.Deps.Auth.Store.Update(admin); err != nil {
+		return err
+	}
+	store.ApplyToConfig(h.Deps.Cfg, s)
+	reauth := prev.Admin.Username != s.Admin.Username || prev.Admin.PasswordHash != s.Admin.PasswordHash
+	if reauth {
+		h.Deps.Auth.Sessions.Clear()
+	}
+	if h.Deps.Cfg.AllowProcessRestart {
+		go func() { time.Sleep(2 * time.Second); restartProcess() }()
+	}
+	saved, err := h.Deps.Repos.App.Get(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"ok": true, "restart_needed": true, "reauth_required": reauth, "settings": saved})
+}
+
+func validateSystemConfig(s domain.AppSettings) error {
+	if s.Admin.Username == "" || s.Admin.SecretPath == "" {
+		return fmt.Errorf("后台用户名和管理路径为必填项")
+	}
+	for _, r := range s.Admin.SecretPath {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return fmt.Errorf("管理路径仅支持字母和数字")
+		}
+	}
+	if s.Admin.WebPort < 1 || s.Admin.WebPort > 65535 || s.Proxy.Port < 1 || s.Proxy.Port > 65535 {
+		return fmt.Errorf("端口范围需为 1-65535")
+	}
+	if s.Admin.SessionTTLSeconds < 60 || s.Proxy.MaxConnections < 1 || s.Discovery.DiscoveryLimit < 1 || s.Discovery.DiscoveryLimit > 1000 {
+		return fmt.Errorf("配置数值超出有效范围")
+	}
+	if s.Proxy.ConnectTimeoutSeconds <= 0 || s.Proxy.IdleTimeoutSeconds <= 0 || s.Discovery.RequestTimeoutSecs <= 0 || s.Maintenance.MaintenanceIntervalSeconds < 60 {
+		return fmt.Errorf("时间间隔需大于有效最小值")
+	}
+	if s.Maintenance.HealthCheckIntervalSeconds <= 0 || s.Maintenance.ActivePingIntervalSeconds <= 0 || s.Maintenance.DisconnectedRetrySeconds <= 0 ||
+		s.Maintenance.OpenVPNTestTimeoutSeconds <= 0 || s.Maintenance.OpenVPNConnectTimeoutSeconds <= 0 || s.Network.RoutingRetryIntervalSeconds <= 0 ||
+		s.Discovery.IPInfoCacheSeconds < 1 || s.Maintenance.InvalidBackoffSeconds < 1 || s.Maintenance.StaleNodeGraceSeconds < 1 {
+		return fmt.Errorf("检测、缓存、退避和重试时间需大于 0")
+	}
+	if s.Maintenance.MaxProbeConcurrency < 1 || s.Maintenance.InitialConnectTestLimit < 1 || s.Maintenance.ManualTestNodeLimit < 1 || s.Network.RoutingSetupRetries < 1 {
+		return fmt.Errorf("并发数、检测数和重试数需大于 0")
+	}
+	if s.Proxy.DNSServer == "" || s.Discovery.VPNGateAPIURL == "" || s.Discovery.IPInfoAPIURL == "" {
+		return fmt.Errorf("代理 DNS 和数据源地址为必填项")
+	}
+	return nil
 }
 
 func (h *Handlers) SystemStatus(c *echo.Context) error {

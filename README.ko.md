@@ -71,16 +71,16 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 **3단계 · 관리 주소와 계정·비밀번호 기록**
 
-설치 스크립트가 완료되면 이번 배포에서 무작위로 생성된 경로, 계정, 비밀번호를 **바로 출력**합니다:
+첫 설치가 완료되면 무작위로 생성된 경로, 계정, 비밀번호를 **바로 출력**합니다:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 경로, 계정, 비밀번호는 모두 **배포할 때마다 무작위로 생성**되며 기본값이 전혀 없으니, 그 자리에서 바로 저장하세요(비밀번호는 사후에 복구할 수 없습니다). 이후에는 `free-proxy credentials`로 다시 확인할 수도 있습니다.
-> ⚠️ 설치를 다시 실행할 때마다(즉 업데이트할 때마다) 이 자격 증명 세트가 **다시 교체**되며, 기존 것은 즉시 무효화됩니다.
+> 🔑 경로, 계정, 비밀번호는 **첫 설치 시에만** 무작위로 생성됩니다. 비밀번호는 나중에 복구할 수 없으므로 즉시 저장하세요.
+> 🔒 이후 업데이트에서는 기존 경로, 계정, 비밀번호가 그대로 유지됩니다. 명시적으로 변경하려면 관리 화면이나 `free-proxy install --rotate-admin`을 사용하세요.
 
 ✅ **완료!** 서비스는 이미 백그라운드에서 자동으로 노드를 수집하고, 속도를 측정하고, 연결하고 있습니다. 이제 사용 방법을 살펴봅시다.
 
@@ -95,7 +95,7 @@ Password:  xxxxxxxx
 로그인 + 무작위 시크릿 경로의 이중 보호가 있어, 설치 후 바로 외부 네트워크에서 열 수 있습니다. 브라우저에서 `free-proxy credentials`가 출력한 주소로 접속하세요:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 공인망 접근이 필요 없다면, 관리 콘솔에서 외부 네트워크 스위치를 끄거나 SSH 터널로 바꿔 사용할 수 있습니다(아래 참조).
@@ -104,17 +104,13 @@ http://你的服务器IP:8787/<你的安全路径>/
 
 누구나 사용할 수 있는 **「개방 프록시」**가 되는 것을 방지하기 위해, 프록시는 기본적으로 로컬에만 서비스합니다. 외부 네트워크에서 사용하려면 두 단계:
 
-1. **프록시 비밀번호 설정**: `/etc/free-proxy/free-proxy.env`를 편집하여 아래 두 줄을 추가한 뒤 `systemctl restart free-proxy`를 실행:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
+1. **Configure proxy credentials in the dashboard**: open “Policy → Web and proxy service”, then enter a proxy username and a new password.
 2. **관리 콘솔에서 활성화**: 웹 관리 콘솔의 「정책 → 외부 네트워크 접근」으로 들어가 「프록시 포트 외부 네트워크 접근 허용」을 체크하고 저장.
 
 이후 로컬 애플리케이션에서 사용할 수 있습니다: `socks5://用户名:密码@你的服务器IP:9527`.
 
 > 🔒 가장 보수적인 사용법(공인망을 전혀 열지 않음): 관리 콘솔에서 웹 관리 콘솔 외부 네트워크 접근을 끄고, SSH 터널로 바꿔 사용 ——
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`, 그런 다음 로컬에서 `127.0.0.1`로 접속.
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP`, 그런 다음 로컬에서 `127.0.0.1`로 접속.
 
 ### 프록시가 작동하는지 검증
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**최신 버전으로 업데이트**: 위의 「명령어 한 줄 설치」를 다시 한 번 실행하면 됩니다. 노드 데이터와 설정은 유지되지만, **관리 경로, 계정, 비밀번호는 다시 무작위로 교체**됩니다(설치가 끝날 때 새로운 세트가 출력되니 저장에 유의하세요, 기존 것은 즉시 무효화됩니다).
+**최신 버전으로 업데이트**: 위의 「명령어 한 줄 설치」를 다시 실행하면 됩니다. 노드 데이터, 설정, 관리 경로, 계정, 비밀번호가 모두 유지됩니다.
 
 ---
 
@@ -209,26 +205,24 @@ free-proxy logs --lines 200      # 打印最近日志
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> 리스닝은 `0.0.0.0`에 고정 바인딩됩니다; 외부 네트워크 개방 여부는 **관리 콘솔의 「외부 네트워크 접근」스위치**로 제어됩니다(웹 관리 콘솔은 기본 켜짐, 프록시는 기본 꺼짐), 런타임에 즉시 적용되며 재시작이 필요 없습니다. `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` 설정은 프록시 외부 네트워크 접근을 켜기 위한 전제 조건입니다.
+> Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
 
 사양이 낮은 VPS(예: 1코어 / 1G)는 탐지 부하를 낮출 수 있습니다:
 
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+Use the dashboard to lower probe concurrency, discovery limit, and initial test count.
 
 ### API 요약
 

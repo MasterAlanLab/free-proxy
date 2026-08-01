@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// OutboundConnector dials upstream targets on behalf of proxy clients. In
+// OutboundConnector dials destination targets on behalf of proxy clients. In
 // production the concrete implementation binds sockets to the tunnel interface
 // and resolves DNS through the tunnel; tests can substitute a plain dialer.
 type OutboundConnector interface {

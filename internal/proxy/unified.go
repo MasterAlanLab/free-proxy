@@ -33,9 +33,9 @@ func (g *Gateway) handle(ctx context.Context, conn net.Conn) {
 
 	switch {
 	case first[0] == 0x05:
-		g.serveSOCKS5(ctx, conn, br)
+		g.serveSOCKS5(ctx, conn, br, g.requireProtocolAuth(conn))
 	case isHTTPStart(first[0]):
-		g.serveHTTP(ctx, conn, br)
+		g.serveHTTP(ctx, conn, br, g.requireProtocolAuth(conn))
 	default:
 		// Unknown protocol: drop.
 	}

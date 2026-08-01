@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net"
@@ -24,8 +23,7 @@ import (
 )
 
 // buildDeps wires the entire application graph (the Go analogue of lifespan).
-func buildDeps(ctx context.Context, cfg *config.Config, db *sql.DB, auth *security.AuthService, logs *logging.Store) *api.Deps {
-	repos := store.NewRepos(db)
+func buildDeps(ctx context.Context, cfg *config.Config, repos *store.Repos, auth *security.AuthService, logs *logging.Store) *api.Deps {
 	runner := netx.SystemCommandRunner{}
 
 	coordinator := services.NewCoordinator()
@@ -48,9 +46,16 @@ func buildDeps(ctx context.Context, cfg *config.Config, db *sql.DB, auth *securi
 	connector := proxy.NewSocketConnector(cfg.TunnelInterface, cfg.ProxyDNSServer, cfg.ProxyConnectTimeout())
 	proxyGateway := proxy.New(proxy.Options{
 		Host: "0.0.0.0", Port: adminCfg.ProxyPort,
-		Username: cfg.ProxyUsername, Password: cfg.ProxyPassword,
 		MaxConnections: cfg.ProxyMaxConnections,
 		ConnectTimeout: cfg.ProxyConnectTimeout(), IdleTimeout: cfg.ProxyIdleTimeout(),
+		AuthRequired: func() bool {
+			s, err := repos.App.Get(context.Background())
+			return err == nil && s.Proxy.Username != "" && s.Proxy.PasswordHash != ""
+		},
+		Authenticate: func(username, password string) bool {
+			s, err := repos.App.Get(context.Background())
+			return err == nil && username == s.Proxy.Username && security.VerifyPassword(password, s.Proxy.PasswordHash)
+		},
 		// Listener binds all interfaces; non-loopback clients are gated at runtime
 		// by the admin toggle (default off) and still require proxy auth.
 		ExternalAllowed: func() bool { return auth.Store.Config().ProxyExternalAllowed() },
@@ -61,7 +66,7 @@ func buildDeps(ctx context.Context, cfg *config.Config, db *sql.DB, auth *securi
 	autoSwitch := services.NewAutoSwitchService(cfg, repos.Nodes, repos.Settings, pool, gateway)
 	gateway.SetUnexpectedExitHandler(autoSwitch.HandleUnexpectedExit)
 
-	healthChecker := netx.NewHealthChecker(adminCfg.ProxyHost, adminCfg.ProxyPort, cfg.ProxyUsername, cfg.ProxyPassword, cfg.ProxyConnectTimeout())
+	healthChecker := netx.NewHealthChecker(adminCfg.ProxyHost, adminCfg.ProxyPort, "", "", cfg.ProxyConnectTimeout())
 	health := services.NewHealthService(cfg, healthChecker, repos.Nodes, repos.Settings, gateway, autoSwitch)
 	settingsSvc := services.NewSettingsService(repos.Nodes, repos.Settings, pool, gateway, autoSwitch, coordinator)
 
@@ -99,14 +104,18 @@ func runServe(ctx context.Context, cfg *config.Config, hostOverride string, port
 		return err
 	}
 
-	adminStore, err := security.NewAdminConfigStore(cfg)
+	repos := store.NewRepos(db)
+	if err := prepareAppSettings(ctx, cfg, repos); err != nil {
+		return err
+	}
+	adminStore, err := security.NewAdminConfigStore(cfg, repos.App)
 	if err != nil {
 		return err
 	}
 	auth := security.NewAuthService(cfg, adminStore, security.NewSessionManager(cfg.SessionTTL()))
 	adminCfg := adminStore.Config()
 
-	deps := buildDeps(ctx, cfg, db, auth, logs)
+	deps := buildDeps(ctx, cfg, repos, auth, logs)
 	if err := deps.Jobs.Initialize(ctx); err != nil {
 		slog.Warn("job init failed", "module", "serve", "err", err)
 	}

@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"context"
-	"crypto/subtle"
 	"encoding/binary"
 	"io"
 	"net"
@@ -28,7 +27,7 @@ const (
 	repCmdNotSup   = 0x07
 )
 
-func (g *Gateway) serveSOCKS5(ctx context.Context, conn net.Conn, br *bufio.Reader) {
+func (g *Gateway) serveSOCKS5(ctx context.Context, conn net.Conn, br *bufio.Reader, requireAuth bool) {
 	// Greeting: VER, NMETHODS, METHODS...
 	ver, err := br.ReadByte()
 	if err != nil || ver != socksVersion {
@@ -43,7 +42,7 @@ func (g *Gateway) serveSOCKS5(ctx context.Context, conn net.Conn, br *bufio.Read
 		return
 	}
 
-	if g.authEnabled() {
+	if requireAuth {
 		if !containsByte(methods, authUserPass) {
 			_, _ = conn.Write([]byte{socksVersion, authNoAccept})
 			return
@@ -84,16 +83,16 @@ func (g *Gateway) serveSOCKS5(ctx context.Context, conn net.Conn, br *bufio.Read
 	}
 	port := int(binary.BigEndian.Uint16(portBuf))
 
-	upstream, err := g.connector.Dial(ctx, host, port)
+	targetConn, err := g.connector.Dial(ctx, host, port)
 	if err != nil {
 		g.socksReply(conn, socksErrCode(err))
 		return
 	}
 	if err := g.socksReply(conn, repSuccess); err != nil {
-		_ = upstream.Close()
+		_ = targetConn.Close()
 		return
 	}
-	relay(conn, upstream, g.opts.IdleTimeout)
+	relay(conn, targetConn, g.opts.IdleTimeout)
 }
 
 func (g *Gateway) socksAuth(br *bufio.Reader, conn net.Conn) bool {
@@ -118,8 +117,7 @@ func (g *Gateway) socksAuth(br *bufio.Reader, conn net.Conn) bool {
 	if _, err := io.ReadFull(br, pass); err != nil {
 		return false
 	}
-	ok := subtle.ConstantTimeCompare(user, []byte(g.opts.Username)) == 1 &&
-		subtle.ConstantTimeCompare(pass, []byte(g.opts.Password)) == 1
+	ok := g.authenticate(string(user), string(pass))
 	if ok {
 		_, _ = conn.Write([]byte{0x01, 0x00})
 		return true

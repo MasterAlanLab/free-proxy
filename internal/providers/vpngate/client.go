@@ -7,24 +7,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/masteralanlab/free-proxy/internal/config"
 	"github.com/masteralanlab/free-proxy/internal/domain"
-	"github.com/masteralanlab/free-proxy/internal/netx"
 )
 
-// Provider fetches and parses nodes from VPNGate, with a TLS/HTTP + upstream
-// fallback chain matching the former Python client.
+// Provider fetches and parses nodes from VPNGate with a direct TLS/HTTP fallback chain.
 type Provider struct {
-	apiURL         string
-	limit          int
-	timeout        time.Duration
-	upstreamURL    string
-	directFallback bool
+	apiURL  string
+	limit   int
+	timeout time.Duration
 
 	httpClient *http.Client // optional injected client for tests
 	now        func() time.Time
@@ -35,12 +29,10 @@ type Provider struct {
 // NewProvider builds a Provider from config.
 func NewProvider(cfg *config.Config) *Provider {
 	return &Provider{
-		apiURL:         cfg.VPNGateAPIURL,
-		limit:          cfg.DiscoveryLimit,
-		timeout:        cfg.RequestTimeout(),
-		upstreamURL:    cfg.UpstreamProxyURL,
-		directFallback: cfg.UpstreamDirectFallback,
-		now:            time.Now,
+		apiURL:  cfg.VPNGateAPIURL,
+		limit:   cfg.DiscoveryLimit,
+		timeout: cfg.RequestTimeout(),
+		now:     time.Now,
 	}
 }
 
@@ -64,8 +56,7 @@ type target struct {
 	verify bool
 }
 
-// Discover fetches the node list, trying HTTPS, HTTPS-no-verify, and HTTP, each
-// optionally through the configured upstream proxy then directly.
+// Discover fetches the node list directly, trying HTTPS, HTTPS-no-verify, and HTTP.
 func (p *Provider) Discover(ctx context.Context) ([]domain.DiscoveredNode, error) {
 	if p.httpClient != nil {
 		return p.fetch(ctx, p.httpClient, p.apiURL)
@@ -78,43 +69,15 @@ func (p *Provider) Discover(ctx context.Context) ([]domain.DiscoveredNode, error
 			target{strings.Replace(p.apiURL, "https://", "http://", 1), true},
 		)
 	}
-	upstream := netx.GetUpstreamProxy(p.upstreamURL,
-		os.Getenv("http_proxy"), os.Getenv("HTTP_PROXY"),
-		os.Getenv("https_proxy"), os.Getenv("HTTPS_PROXY"))
-
 	var lastErr error
-	attempt := func(proxyURL string, list []target) ([]domain.DiscoveredNode, bool) {
-		for _, t := range list {
-			client, err := buildClient(proxyURL, t.verify, p.timeout)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-			nodes, err := p.fetch(ctx, client, t.url)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-			return nodes, true
+	for _, t := range targets {
+		client := buildClient(t.verify, p.timeout)
+		nodes, err := p.fetch(ctx, client, t.url)
+		if err != nil {
+			lastErr = err
+			continue
 		}
-		return nil, false
-	}
-
-	proxyStr := ""
-	if upstream != nil {
-		proxyStr = upstream.URL()
-	}
-	if nodes, ok := attempt(proxyStr, targets); ok {
 		return nodes, nil
-	}
-	if upstream == nil {
-		if nodes, ok := attempt("", targets[:1]); ok {
-			return nodes, nil
-		}
-	} else if p.directFallback {
-		if nodes, ok := attempt("", targets); ok {
-			return nodes, nil
-		}
 	}
 	if lastErr == nil {
 		lastErr = errors.New("no reachable endpoint")
@@ -151,16 +114,9 @@ func (p *Provider) fetch(ctx context.Context, client *http.Client, endpoint stri
 	return res.Nodes, nil
 }
 
-func buildClient(proxyURL string, verify bool, timeout time.Duration) (*http.Client, error) {
+func buildClient(verify bool, timeout time.Duration) *http.Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !verify}, //nolint:gosec // intentional TLS fallback
 	}
-	if proxyURL != "" {
-		pu, err := url.Parse(proxyURL)
-		if err != nil {
-			return nil, err
-		}
-		tr.Proxy = http.ProxyURL(pu)
-	}
-	return &http.Client{Timeout: timeout, Transport: tr}, nil
+	return &http.Client{Timeout: timeout, Transport: tr}
 }

@@ -15,7 +15,6 @@ import (
 
 	"github.com/masteralanlab/free-proxy/internal/config"
 	"github.com/masteralanlab/free-proxy/internal/domain"
-	"github.com/masteralanlab/free-proxy/internal/netx"
 )
 
 var versionRe = regexp.MustCompile(`OpenVPN\s+(\d+)\.(\d+)`)
@@ -25,8 +24,7 @@ type Manager struct {
 	cfg    *config.Config
 	runner Runner
 
-	authFile         string
-	upstreamAuthFile string
+	authFile string
 
 	mu           sync.Mutex
 	active       *Managed
@@ -38,9 +36,8 @@ type Manager struct {
 // NewManager constructs a Manager.
 func NewManager(cfg *config.Config) *Manager {
 	return &Manager{
-		cfg:              cfg,
-		authFile:         filepath.Join(cfg.DataDir, "openvpn-auth.txt"),
-		upstreamAuthFile: filepath.Join(cfg.DataDir, "upstream-proxy-auth.txt"),
+		cfg:      cfg,
+		authFile: filepath.Join(cfg.DataDir, "openvpn-auth.txt"),
 	}
 }
 
@@ -69,10 +66,9 @@ func (m *Manager) Probe(ctx context.Context, configText, device string) domain.T
 	}
 	defer os.Remove(configPath)
 	version := m.detectVersion(ctx)
-	upstream, upstreamAuth := m.upstreamOptions(configText)
 	args := BuildArgs(BuildParams{
 		Executable: ParseExecutable(m.cfg.OpenVPNCommand), ConfigFile: configPath, AuthFile: m.authFile,
-		Device: device, RouteNoPull: true, Version: version, Upstream: upstream, UpstreamAuthFile: upstreamAuth,
+		Device: device, RouteNoPull: true, Version: version,
 	})
 	res, _ := m.runner.Start(ctx, StartParams{
 		Bin: args[0], Args: args[1:], ConfigPath: configPath, Device: device,
@@ -97,11 +93,9 @@ func (m *Manager) Connect(ctx context.Context, nodeID, configText string) domain
 	if err != nil {
 		return failResult(domain.FailStartFailed, "unable to write config: "+err.Error(), time.Now(), nil)
 	}
-	upstream, upstreamAuth := m.upstreamOptions(configText)
 	args := BuildArgs(BuildParams{
 		Executable: ParseExecutable(m.cfg.OpenVPNCommand), ConfigFile: configPath, AuthFile: m.authFile,
 		Device: m.cfg.TunnelInterface, RouteNoPull: true, Version: version,
-		Upstream: upstream, UpstreamAuthFile: upstreamAuth,
 	})
 	res, managed := m.runner.Start(ctx, StartParams{
 		Bin: args[0], Args: args[1:], ConfigPath: configPath, Device: m.cfg.TunnelInterface,
@@ -155,7 +149,7 @@ func (m *Manager) ClearExitedProcess() {
 // CleanupStaleProcesses terminates leftover openvpn processes started by this
 // project (identified by config/auth paths in their cmdline). Linux only.
 func (m *Manager) CleanupStaleProcesses() []int {
-	markers := []string{m.cfg.DataDir, m.authFile, m.upstreamAuthFile}
+	markers := []string{m.cfg.DataDir, m.authFile}
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil
@@ -216,26 +210,6 @@ func (m *Manager) writeConfig(configText, prefix string) (string, error) {
 	return path, nil
 }
 
-func (m *Manager) upstreamOptions(configText string) (*netx.UpstreamProxy, string) {
-	if !IsTCPConfig(configText) {
-		return nil, ""
-	}
-	upstream := netx.GetUpstreamProxy(m.cfg.UpstreamProxyURL,
-		os.Getenv("http_proxy"), os.Getenv("HTTP_PROXY"),
-		os.Getenv("https_proxy"), os.Getenv("HTTPS_PROXY"))
-	if upstream == nil {
-		return nil, ""
-	}
-	if !upstream.HasAuth {
-		return upstream, ""
-	}
-	data := upstream.Username + "\n" + upstream.Password + "\n"
-	if err := os.WriteFile(m.upstreamAuthFile, []byte(data), 0o600); err != nil {
-		return upstream, ""
-	}
-	return upstream, m.upstreamAuthFile
-}
-
 func (m *Manager) detectVersion(ctx context.Context) Version {
 	m.mu.Lock()
 	if m.version != nil {
@@ -261,21 +235,4 @@ func (m *Manager) detectVersion(ctx context.Context) Version {
 	m.version = &v
 	m.mu.Unlock()
 	return v
-}
-
-// IsTCPConfig reports whether an OpenVPN config uses TCP transport.
-func IsTCPConfig(configText string) bool {
-	for _, raw := range strings.Split(configText, "\n") {
-		line := strings.ToLower(strings.TrimSpace(raw))
-		if strings.HasPrefix(line, "proto ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 && strings.Contains(fields[1], "tcp") {
-				return true
-			}
-		}
-		if strings.HasPrefix(line, "remote ") && strings.Contains(" "+line, " tcp") {
-			return true
-		}
-	}
-	return false
 }

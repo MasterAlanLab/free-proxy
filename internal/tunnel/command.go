@@ -2,10 +2,7 @@ package tunnel
 
 import (
 	"os"
-	"strconv"
 	"strings"
-
-	"github.com/masteralanlab/free-proxy/internal/netx"
 )
 
 // Version is an OpenVPN major.minor version.
@@ -21,14 +18,12 @@ func (v Version) GTE(major, minor int) bool {
 
 // BuildParams configures an OpenVPN invocation.
 type BuildParams struct {
-	Executable       []string
-	ConfigFile       string
-	AuthFile         string
-	Device           string
-	RouteNoPull      bool
-	Version          Version
-	Upstream         *netx.UpstreamProxy
-	UpstreamAuthFile string
+	Executable  []string
+	ConfigFile  string
+	AuthFile    string
+	Device      string
+	RouteNoPull bool
+	Version     Version
 }
 
 const dataCiphers = "AES-128-CBC:AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305"
@@ -60,16 +55,6 @@ func BuildArgs(p BuildParams) []string {
 	}
 	if p.RouteNoPull {
 		args = append(args, "--route-nopull")
-	}
-	if p.Upstream != nil {
-		opt := "--http-proxy"
-		if p.Upstream.Kind == "socks" {
-			opt = "--socks-proxy"
-		}
-		args = append(args, opt, p.Upstream.Host, strconv.Itoa(p.Upstream.Port))
-		if p.UpstreamAuthFile != "" {
-			args = append(args, p.UpstreamAuthFile)
-		}
 	}
 	return args
 }

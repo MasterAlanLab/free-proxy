@@ -1,5 +1,5 @@
 // Package netx wraps host network operations: running ip/sysctl commands,
-// policy routing, latency probes, upstream proxy parsing, and the test-time TUN
+// policy routing, latency probes, and the test-time TUN
 // device pool. It depends only on config/domain and the standard library.
 package netx
 

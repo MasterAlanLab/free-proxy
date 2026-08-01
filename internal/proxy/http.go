@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"context"
-	"crypto/subtle"
 	"encoding/base64"
 	"io"
 	"net"
@@ -11,13 +10,13 @@ import (
 	"strings"
 )
 
-func (g *Gateway) serveHTTP(ctx context.Context, conn net.Conn, br *bufio.Reader) {
+func (g *Gateway) serveHTTP(ctx context.Context, conn net.Conn, br *bufio.Reader, requireAuth bool) {
 	req, err := http.ReadRequest(br)
 	if err != nil {
 		return
 	}
 
-	if g.authEnabled() && !g.httpAuthOK(req) {
+	if requireAuth && !g.httpAuthOK(req) {
 		_, _ = conn.Write([]byte(
 			"HTTP/1.1 407 Proxy Authentication Required\r\n" +
 				"Proxy-Authenticate: Basic realm=\"free-proxy\"\r\n" +
@@ -34,16 +33,16 @@ func (g *Gateway) serveHTTP(ctx context.Context, conn net.Conn, br *bufio.Reader
 
 func (g *Gateway) httpConnect(ctx context.Context, conn net.Conn, hostport string) {
 	host, port := splitHostPort(hostport, 443)
-	upstream, err := g.connector.Dial(ctx, host, port)
+	targetConn, err := g.connector.Dial(ctx, host, port)
 	if err != nil {
 		_, _ = conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n"))
 		return
 	}
 	if _, err := conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
-		_ = upstream.Close()
+		_ = targetConn.Close()
 		return
 	}
-	relay(conn, upstream, g.opts.IdleTimeout)
+	relay(conn, targetConn, g.opts.IdleTimeout)
 }
 
 func (g *Gateway) httpForward(ctx context.Context, conn net.Conn, req *http.Request) {
@@ -58,21 +57,21 @@ func (g *Gateway) httpForward(ctx context.Context, conn net.Conn, req *http.Requ
 	if p := req.URL.Port(); p != "" {
 		port = atoiDefault(p, 80)
 	}
-	upstream, err := g.connector.Dial(ctx, host, port)
+	targetConn, err := g.connector.Dial(ctx, host, port)
 	if err != nil {
 		_, _ = conn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n"))
 		return
 	}
-	defer upstream.Close()
+	defer targetConn.Close()
 
 	req.Header.Del("Proxy-Authorization")
 	req.Header.Del("Proxy-Connection")
 	req.Close = true
 	// Write in origin form (URL.RequestURI) with Host header to the origin.
-	if err := req.Write(upstream); err != nil {
+	if err := req.Write(targetConn); err != nil {
 		return
 	}
-	_, _ = io.Copy(conn, upstream)
+	_, _ = io.Copy(conn, targetConn)
 }
 
 func (g *Gateway) httpAuthOK(req *http.Request) bool {
@@ -89,8 +88,7 @@ func (g *Gateway) httpAuthOK(req *http.Request) bool {
 	if !ok {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(user), []byte(g.opts.Username)) == 1 &&
-		subtle.ConstantTimeCompare([]byte(pass), []byte(g.opts.Password)) == 1
+	return g.authenticate(user, pass)
 }
 
 func splitHostPort(hostport string, defPort int) (string, int) {

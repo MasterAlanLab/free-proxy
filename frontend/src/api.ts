@@ -1,5 +1,5 @@
 import type {
-  AccessConfig, AuthConfig, GatewayStatus, Job, LogEntry, PoolStatistics, ProxyHealthResult,
+  AccessConfig, AppSettings, AuthConfig, GatewayStatus, Job, LogEntry, PoolStatistics, ProxyHealthResult,
   ProxyNodePage, ProxySettings, SystemDiagnostics, SystemStatus,
 } from "./types";
 
@@ -86,6 +86,11 @@ export const dnsRepair = () => post("/system/dns/repair");
 export const getAccess = () => request<AccessConfig>("/system/access");
 export const updateAccess = (payload: { web_external_access: boolean; proxy_external_access: boolean }) =>
   request<AccessConfig>("/system/access", { method: "PUT", body: JSON.stringify(payload) });
+export const getSystemConfig = () => request<AppSettings>("/system/config");
+export const updateSystemConfig = (settings: AppSettings, adminPassword: string, proxyPassword: string) =>
+  request<{ ok: boolean; restart_needed: boolean; reauth_required: boolean; settings: AppSettings }>("/system/config", {
+    method: "PUT", body: JSON.stringify({ settings, admin_password: adminPassword, proxy_password: proxyPassword }),
+  });
 export const getLogs = (params: Record<string, string | number>) => {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== "" && v !== undefined) q.set(k, String(v));

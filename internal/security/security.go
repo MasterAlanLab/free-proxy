@@ -4,6 +4,7 @@
 package security
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
@@ -18,6 +19,7 @@ import (
 	"unicode"
 
 	"github.com/masteralanlab/free-proxy/internal/config"
+	"github.com/masteralanlab/free-proxy/internal/store"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -88,226 +90,216 @@ func RandomCredential(length int) string {
 	}
 }
 
-// AdminConfig is the persisted admin/listener configuration.
+// AdminConfig is the database-backed admin/listener configuration. Host values
+// are fixed listener constants; the ports and exposure flags are persisted.
 type AdminConfig struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
-	SecretPath   string `json:"secret_path"`
-	Host         string `json:"host"`
-	Port         int    `json:"port"`
-	ProxyHost    string `json:"proxy_host"`
-	ProxyPort    int    `json:"proxy_port"`
-	// Network-exposure toggles. Listeners always bind 0.0.0.0; these gate whether
-	// non-loopback clients are actually served, and can be flipped at runtime from
-	// the admin UI. nil means "unset" and falls back to the safe default below.
-	WebExternalAccess   *bool `json:"web_external_access,omitempty"`
-	ProxyExternalAccess *bool `json:"proxy_external_access,omitempty"`
+	Username            string
+	PasswordHash        string
+	SecretPath          string
+	Host                string
+	Port                int
+	ProxyHost           string
+	ProxyPort           int
+	WebExternalAccess   *bool
+	ProxyExternalAccess *bool
 }
 
-// WebExternalAllowed reports whether the web admin serves non-loopback clients.
-// Default true: the admin UI is already protected by login + a secret path.
 func (c AdminConfig) WebExternalAllowed() bool {
 	return c.WebExternalAccess == nil || *c.WebExternalAccess
 }
 
-// ProxyExternalAllowed reports whether the proxy serves non-loopback clients.
-// Default false: avoids accidentally exposing an open proxy to the internet.
 func (c AdminConfig) ProxyExternalAllowed() bool {
 	return c.ProxyExternalAccess != nil && *c.ProxyExternalAccess
 }
 
-// AdminConfigStore loads/persists the admin config and one-time bootstrap password.
+// AdminConfigStore persists management credentials in SQLite. web-config.json
+// is read only for a one-time migration and is removed after the transaction.
 type AdminConfigStore struct {
-	cfg           *config.Config
-	path          string
-	bootstrapPath string
+	cfg  *config.Config
+	repo *store.AppSettingsRepository
 
-	mu     sync.RWMutex
-	config AdminConfig
+	mu                sync.RWMutex
+	config            AdminConfig
+	bootstrapPassword string
 }
 
-// NewAdminConfigStore loads or creates the admin config.
-func NewAdminConfigStore(cfg *config.Config) (*AdminConfigStore, error) {
-	s := &AdminConfigStore{
-		cfg:           cfg,
-		path:          filepath.Join(cfg.DataDir, "web-config.json"),
-		bootstrapPath: filepath.Join(cfg.DataDir, "initial-admin-password"),
-	}
-	c, err := s.loadOrCreate()
-	if err != nil {
+// NewAdminConfigStore loads database settings, migrates legacy files, or creates
+// random first-install credentials. Plaintext bootstrap passwords live only in
+// this process and are never written to disk.
+func NewAdminConfigStore(cfg *config.Config, repo *store.AppSettingsRepository) (*AdminConfigStore, error) {
+	s := &AdminConfigStore{cfg: cfg, repo: repo}
+	if err := s.loadOrCreate(); err != nil {
 		return nil, err
 	}
-	s.config = c
 	return s, nil
 }
 
-// Config returns a copy of the current config.
 func (s *AdminConfigStore) Config() AdminConfig {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.config
 }
 
-// Update persists a new config and clears the bootstrap password.
 func (s *AdminConfigStore) Update(c AdminConfig) error {
-	if err := s.write(c); err != nil {
+	all, err := s.repo.Get(context.Background())
+	if err != nil {
+		return err
+	}
+	all.Admin.Username = c.Username
+	all.Admin.PasswordHash = c.PasswordHash
+	all.Admin.SecretPath = c.SecretPath
+	all.Admin.WebPort = c.Port
+	all.Admin.WebExternalAccess = c.WebExternalAllowed()
+	all.Proxy.Port = c.ProxyPort
+	all.Proxy.ExternalAccess = c.ProxyExternalAllowed()
+	if err := s.repo.UpdateAdmin(context.Background(), all.Admin); err != nil {
+		return err
+	}
+	if err := s.repo.UpdateProxy(context.Background(), all.Proxy); err != nil {
 		return err
 	}
 	s.mu.Lock()
 	s.config = c
+	s.bootstrapPassword = ""
 	s.mu.Unlock()
-	s.ClearBootstrapPassword()
 	return nil
 }
 
-// Rotate regenerates the secret path, username, and password with fresh random
-// values, persists them, and records the new password as the one-time bootstrap
-// secret (so `credentials` can display it). Returns the updated config and the
-// new plaintext password. Called on every deployment so each install gets a
-// unique, unpredictable management path and admin credentials.
 func (s *AdminConfigStore) Rotate() (AdminConfig, string, error) {
 	password := RandomCredential(12)
 	hash, err := HashPassword(password)
 	if err != nil {
 		return AdminConfig{}, "", err
 	}
-	s.mu.Lock()
-	c := s.config
-	c.Username = RandomCredential(12)
-	c.PasswordHash = hash
-	c.SecretPath = RandomCredential(12)
-	if err := s.write(c); err != nil {
-		s.mu.Unlock()
+	c := s.Config()
+	c.Username, c.PasswordHash, c.SecretPath = RandomCredential(12), hash, RandomCredential(12)
+	if err := s.Update(c); err != nil {
 		return AdminConfig{}, "", err
 	}
-	s.config = c
+	s.mu.Lock()
+	s.bootstrapPassword = password
 	s.mu.Unlock()
-	s.writeBootstrap(password)
 	return c, password, nil
 }
 
-// SetExternalAccess flips the network-exposure toggles at runtime (persisted +
-// in-memory) without touching credentials or the bootstrap password.
 func (s *AdminConfigStore) SetExternalAccess(web, proxy bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	c := s.config
-	c.WebExternalAccess = &web
-	c.ProxyExternalAccess = &proxy
-	if err := s.write(c); err != nil {
-		return err
-	}
-	s.config = c
-	return nil
+	c := s.Config()
+	c.WebExternalAccess, c.ProxyExternalAccess = &web, &proxy
+	return s.Update(c)
 }
 
-// BootstrapPassword returns the one-time password, or "" if none.
 func (s *AdminConfigStore) BootstrapPassword() string {
-	data, err := os.ReadFile(s.bootstrapPath)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.bootstrapPassword
 }
 
-// ClearBootstrapPassword deletes the one-time password file.
 func (s *AdminConfigStore) ClearBootstrapPassword() {
-	_ = os.Remove(s.bootstrapPath)
+	s.mu.Lock()
+	s.bootstrapPassword = ""
+	s.mu.Unlock()
 }
 
-func (s *AdminConfigStore) loadOrCreate() (AdminConfig, error) {
-	if data, err := os.ReadFile(s.path); err == nil {
-		var raw map[string]any
-		if json.Unmarshal(data, &raw) == nil {
-			if pw, ok := raw["password"].(string); ok && pw != "" {
-				if _, hashed := raw["password_hash"].(string); !hashed {
-					c, err := s.migrate(raw, pw)
-					if err == nil {
-						return c, s.write(c)
-					}
-				}
+func (s *AdminConfigStore) loadOrCreate() error {
+	ctx := context.Background()
+	all, err := s.repo.Get(ctx)
+	if err != nil {
+		return err
+	}
+	legacyPath := filepath.Join(s.cfg.DataDir, "web-config.json")
+	bootstrapPath := filepath.Join(s.cfg.DataDir, "initial-admin-password")
+	legacy, legacyOK := readLegacyAdmin(legacyPath)
+	if all.Admin.PasswordHash == "" && legacyOK {
+		if legacy.PasswordHash == "" && legacy.PlaintextPassword != "" {
+			legacy.PasswordHash, err = HashPassword(legacy.PlaintextPassword)
+			if err != nil {
+				return err
 			}
-			var c AdminConfig
-			if json.Unmarshal(data, &c) == nil && c.SecretPath != "" {
-				return c, nil
-			}
+		}
+		all.Admin.Username = firstNonEmpty(legacy.Username, RandomCredential(12))
+		all.Admin.PasswordHash = legacy.PasswordHash
+		all.Admin.SecretPath = firstNonEmpty(legacy.SecretPath, RandomCredential(12))
+		all.Admin.WebPort = legacy.Port
+		if all.Admin.WebPort == 0 || all.Admin.WebPort == 8787 {
+			all.Admin.WebPort = 39527
+		}
+		all.Admin.WebExternalAccess = legacy.WebExternalAllowed()
+		if legacy.ProxyPort > 0 {
+			all.Proxy.Port = legacy.ProxyPort
+		}
+		all.Proxy.ExternalAccess = legacy.ProxyExternalAllowed()
+		if err = s.repo.UpdateAdmin(ctx, all.Admin); err != nil {
+			return err
+		}
+		if err = s.repo.UpdateProxy(ctx, all.Proxy); err != nil {
+			return err
+		}
+		if legacy.PlaintextPassword != "" {
+			s.bootstrapPassword = legacy.PlaintextPassword
 		}
 	}
-	password := s.cfg.AdminPassword
-	if password == "" {
-		password = RandomCredential(12)
-	}
-	hash, err := HashPassword(password)
-	if err != nil {
-		return AdminConfig{}, err
-	}
-	c := AdminConfig{
-		Username:     firstNonEmpty(s.cfg.AdminUsername, RandomCredential(12)),
-		PasswordHash: hash,
-		SecretPath:   firstNonEmpty(s.cfg.AdminSecretPath, RandomCredential(12)),
-		Host:         s.cfg.WebHost,
-		Port:         s.cfg.WebPort,
-		ProxyHost:    s.cfg.ProxyHost,
-		ProxyPort:    s.cfg.ProxyPort,
-	}
-	if err := s.write(c); err != nil {
-		return AdminConfig{}, err
-	}
-	if s.cfg.AdminPassword == "" {
-		s.writeBootstrap(password)
-	}
-	return c, nil
-}
-
-func (s *AdminConfigStore) migrate(raw map[string]any, plaintext string) (AdminConfig, error) {
-	hash, err := HashPassword(plaintext)
-	if err != nil {
-		return AdminConfig{}, err
-	}
-	str := func(k, def string) string {
-		if v, ok := raw[k].(string); ok && v != "" {
-			return v
+	if all.Admin.PasswordHash == "" {
+		password := firstNonEmpty(s.cfg.AdminPassword, RandomCredential(12))
+		hash, hashErr := HashPassword(password)
+		if hashErr != nil {
+			return hashErr
 		}
-		return def
-	}
-	num := func(k string, def int) int {
-		if v, ok := raw[k].(float64); ok {
-			return int(v)
+		all.Admin.Username = firstNonEmpty(s.cfg.AdminUsername, RandomCredential(12))
+		all.Admin.PasswordHash = hash
+		all.Admin.SecretPath = firstNonEmpty(s.cfg.AdminSecretPath, RandomCredential(12))
+		if all.Admin.WebPort == 0 || all.Admin.WebPort == 8787 {
+			all.Admin.WebPort = 39527
 		}
-		return def
+		if err = s.repo.UpdateAdmin(ctx, all.Admin); err != nil {
+			return err
+		}
+		if s.cfg.AdminPassword == "" {
+			s.bootstrapPassword = password
+		}
 	}
-	return AdminConfig{
-		Username:     str("username", RandomCredential(12)),
-		PasswordHash: hash,
-		SecretPath:   str("secret_path", RandomCredential(12)),
-		Host:         str("host", s.cfg.WebHost),
-		Port:         num("port", s.cfg.WebPort),
-		ProxyHost:    str("proxy_host", s.cfg.ProxyHost),
-		ProxyPort:    num("proxy_port", s.cfg.ProxyPort),
-	}, nil
-}
-
-func (s *AdminConfigStore) write(c AdminConfig) error {
-	if err := s.cfg.EnsureDirectories(); err != nil {
-		return err
+	// Preserve an old one-time password for the current install invocation only.
+	if s.bootstrapPassword == "" {
+		if data, readErr := os.ReadFile(bootstrapPath); readErr == nil {
+			s.bootstrapPassword = strings.TrimSpace(string(data))
+		}
 	}
-	data, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		return err
+	_ = os.Remove(legacyPath)
+	_ = os.Remove(bootstrapPath)
+	web, proxy := all.Admin.WebExternalAccess, all.Proxy.ExternalAccess
+	s.config = AdminConfig{
+		Username: all.Admin.Username, PasswordHash: all.Admin.PasswordHash,
+		SecretPath: all.Admin.SecretPath, Host: "0.0.0.0", Port: all.Admin.WebPort,
+		ProxyHost: "0.0.0.0", ProxyPort: all.Proxy.Port,
+		WebExternalAccess: &web, ProxyExternalAccess: &proxy,
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, s.path); err != nil {
-		return err
-	}
-	_ = os.Chmod(s.path, 0o600)
 	return nil
 }
 
-func (s *AdminConfigStore) writeBootstrap(password string) {
-	_ = os.WriteFile(s.bootstrapPath, []byte(password+"\n"), 0o600)
+type legacyAdminConfig struct {
+	Username            string `json:"username"`
+	PasswordHash        string `json:"password_hash"`
+	PlaintextPassword   string `json:"password"`
+	SecretPath          string `json:"secret_path"`
+	Port                int    `json:"port"`
+	ProxyPort           int    `json:"proxy_port"`
+	WebExternalAccess   *bool  `json:"web_external_access"`
+	ProxyExternalAccess *bool  `json:"proxy_external_access"`
+}
+
+func (c legacyAdminConfig) WebExternalAllowed() bool {
+	return c.WebExternalAccess == nil || *c.WebExternalAccess
+}
+func (c legacyAdminConfig) ProxyExternalAllowed() bool {
+	return c.ProxyExternalAccess != nil && *c.ProxyExternalAccess
+}
+
+func readLegacyAdmin(path string) (legacyAdminConfig, bool) {
+	var c legacyAdminConfig
+	data, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(data, &c) != nil {
+		return c, false
+	}
+	return c, c.SecretPath != "" || c.PasswordHash != "" || c.PlaintextPassword != ""
 }
 
 func firstNonEmpty(a, b string) string {

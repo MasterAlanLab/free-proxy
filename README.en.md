@@ -71,16 +71,16 @@ The script automatically: downloads the build for your architecture → installs
 
 **Step 3 · Note down the admin URL and login credentials**
 
-When the install script finishes, it **prints directly** the path, username, and password randomly generated for this deployment:
+After the first install, the script **prints directly** the randomly generated path, username, and password:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 The path, username, and password are all **randomly generated on every deployment**, with no defaults whatsoever — save them on the spot (the password cannot be recovered afterward). You can also view them again later with `free-proxy credentials`.
-> ⚠️ Every time you re-run the install (i.e. an update), this set of credentials is **rotated anew**, and the old ones become invalid immediately.
+> 🔑 The path, username, and password are randomly generated only on the **first install**, with no defaults. Save them immediately because the password cannot be recovered later.
+> 🔒 Re-running the installer for an update preserves the existing path, username, and password. To change them explicitly, use the dashboard or run `free-proxy install --rotate-admin`.
 
 ✅ **Done!** The service is already fetching nodes, running speed tests, and connecting in the background. Next, let's see how to use it.
 
@@ -95,7 +95,7 @@ The service listens on `0.0.0.0` by default and includes a built-in **"external 
 Protected by both login and a random secret path, so you can open it from the internet right after install. Visit the address printed by `free-proxy credentials` in your browser:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 If you don't need public access, you can turn off its external-access toggle in the dashboard, or use an SSH tunnel instead (see below).
@@ -104,17 +104,13 @@ If you don't need public access, you can turn off its external-access toggle in 
 
 To avoid becoming an **"open proxy"** anyone can use, the proxy serves only the local machine by default. To use it from the internet, two steps:
 
-1. **Set a proxy password**: edit `/etc/free-proxy/free-proxy.env`, add the two lines below, then run `systemctl restart free-proxy`:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
+1. **Configure proxy credentials in the dashboard**: open “Policy → Web and proxy service”, then enter a proxy username and a new password.
 2. **Enable it in the dashboard**: go to "Policy → External access", check "Allow external access to the proxy port", and save.
 
 After that you can use it in apps on your local machine: `socks5://用户名:密码@你的服务器IP:9527`.
 
 > 🔒 The most conservative approach (no public access at all): turn off external access to the web dashboard in the settings and use an SSH tunnel instead —
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`, then access `127.0.0.1` locally.
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP`, then access `127.0.0.1` locally.
 
 ### Verify the proxy is working
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**Update to the latest version**: just run the "one-command install" above again. Node data and settings are preserved; however, **the admin path, username, and password are re-randomized and rotated** (a new set is printed when the install finishes — be sure to save it, as the old one becomes invalid immediately).
+**Update to the latest version**: just run the "one-command install" above again. Node data, settings, admin path, username, and password are all preserved.
 
 ---
 
@@ -209,26 +205,24 @@ The production config file defaults to `/etc/free-proxy/free-proxy.env` (generat
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> The listener is fixed to bind `0.0.0.0`; whether it is exposed to the internet is controlled by the **dashboard's "external access" toggle** (web dashboard on by default, proxy off by default), effective instantly at runtime with no restart. Setting `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` is a prerequisite for enabling external proxy access.
+> Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
 
 On low-spec VPSes (e.g. 1 core / 1 GB) you can lower the probe load:
 
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+Use the dashboard to lower probe concurrency, discovery limit, and initial test count.
 
 ### API Overview
 

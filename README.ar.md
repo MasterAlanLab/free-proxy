@@ -71,16 +71,16 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 **الخطوة 3 · سجّل عنوان الإدارة واسم المستخدم وكلمة المرور**
 
-عند انتهاء سكربت التثبيت، سيقوم **مباشرة بطباعة** المسار واسم المستخدم وكلمة المرور المولّدة عشوائيًا لهذا النشر:
+بعد التثبيت الأول، سيقوم السكربت **مباشرة بطباعة** المسار واسم المستخدم وكلمة المرور المولّدة عشوائيًا:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 المسار واسم المستخدم وكلمة المرور جميعها **مولّدة عشوائيًا مع كل عملية نشر**، ولا توجد أي قيم افتراضية، فاحفظها في حينه (لا يمكن استرجاع كلمة المرور لاحقًا). يمكنك أيضًا عرضها لاحقًا عبر `free-proxy credentials`.
-> ⚠️ كل إعادة تشغيل للتثبيت (أي التحديث) سيؤدي إلى **تدوير** هذه الاعتمادات من جديد، وتصبح القديمة غير صالحة فورًا.
+> 🔑 يتم توليد المسار واسم المستخدم وكلمة المرور عشوائيًا عند **التثبيت الأول فقط**. احفظها فورًا لأن كلمة المرور لا يمكن استرجاعها لاحقًا.
+> 🔒 تحتفظ التحديثات اللاحقة بالمسار واسم المستخدم وكلمة المرور. لتغييرها صراحةً استخدم لوحة الإدارة أو `free-proxy install --rotate-admin`.
 
 ✅ **تم!** الخدمة تعمل الآن في الخلفية وتقوم تلقائيًا بسحب العقد وقياس السرعة والاتصال. لننتقل الآن إلى كيفية الاستخدام.
 
@@ -95,7 +95,7 @@ Password:  xxxxxxxx
 محمية بحماية مزدوجة: تسجيل دخول + مسار مفتاح عشوائي، فيمكنك فتحها من الخارج فور التثبيت. افتح في المتصفح العنوان الذي طبعه `free-proxy credentials`:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 إن لم تكن بحاجة إلى الوصول العام، يمكنك إيقاف مفتاح الوصول الخارجي الخاص بها في اللوحة، أو استخدام نفق SSH بدلًا منه (انظر أدناه).
@@ -104,17 +104,13 @@ http://你的服务器IP:8787/<你的安全路径>/
 
 لتجنّب أن يصبح **«بروكسي مفتوحًا»** متاحًا للجميع، يخدم البروكسي الجهاز المحلي فقط افتراضيًا. للاستخدام من الخارج، خطوتان:
 
-1. **ضبط كلمة مرور البروكسي**: عدّل الملف `/etc/free-proxy/free-proxy.env` وأضف السطرين التاليين، ثم نفّذ `systemctl restart free-proxy`:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
+1. **Configure proxy credentials in the dashboard**: open “Policy → Web and proxy service”, then enter a proxy username and a new password.
 2. **التفعيل من اللوحة**: ادخل إلى لوحة الويب «الاستراتيجية ← الوصول من الخارج»، وفعّل «السماح بالوصول الخارجي لمنفذ البروكسي» ثم احفظ.
 
 بعد ذلك يمكنك الاستخدام في تطبيقات جهازك المحلي: `socks5://用户名:密码@你的服务器IP:9527`.
 
 > 🔒 الاستخدام الأكثر تحفظًا (دون فتح أي وصول عام إطلاقًا): أوقف من اللوحة الوصول الخارجي للوحة الويب، واستخدم نفق SSH بدلًا منه —
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`، ثم افتح محليًا `127.0.0.1`.
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP`، ثم افتح محليًا `127.0.0.1`.
 
 ### التحقق من أن البروكسي يعمل
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**التحديث إلى أحدث إصدار**: أعد تنفيذ «أمر التثبيت الواحد» أعلاه مرة أخرى فحسب. ستُحفظ بيانات العقد والإعدادات؛ لكن **مسار الإدارة واسم المستخدم وكلمة المرور ستُدوَّر عشوائيًا من جديد** (ستُطبع مجموعة جديدة عند انتهاء التثبيت، فانتبه إلى حفظها، وتصبح القديمة غير صالحة فورًا).
+**التحديث إلى أحدث إصدار**: أعد تنفيذ أمر التثبيت أعلاه. سيتم الاحتفاظ ببيانات العقد والإعدادات ومسار الإدارة واسم المستخدم وكلمة المرور دون تغيير.
 
 ---
 
@@ -209,26 +205,24 @@ free-proxy logs --lines 200      # 打印最近日志
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> يرتبط الاستماع دائمًا بـ `0.0.0.0`؛ أما فتح الوصول من الخارج فيتحكم فيه **مفتاح «الوصول من الخارج» في اللوحة** (لوحة الويب مفتوحة افتراضيًا، والبروكسي مغلق افتراضيًا)، ويسري وقت التشغيل فورًا دون إعادة تشغيل. ويُعدّ ضبط `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` شرطًا لتفعيل الوصول الخارجي للبروكسي.
+> Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
 
 للخوادم الصغيرة ضعيفة الإمكانات (مثل 1 نواة / 1G) يمكن تخفيض حِمل الفحص:
 
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+Use the dashboard to lower probe concurrency, discovery limit, and initial test count.
 
 ### ملخص API
 

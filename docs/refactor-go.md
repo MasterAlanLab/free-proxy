@@ -19,10 +19,10 @@
 **必须保持不变的对外契约**（保证可平滑替换、前端/客户端零改动）
 
 1. REST API 路径与语义：`/{secret_path}/api/v1/...`，26 个端点，长任务返回 `202 + Job` 后轮询。
-2. 环境变量：`FREE_PROXY_` 前缀，键名与语义与现状一致。
+2. 环境变量：`FREE_PROXY_` 前缀，仅保留启动、数据库、OpenVPN与 TUN 等机器配置；运行配置存 SQLite。
 3. 代理端口行为：单端口 `9527` 首字节识别 SOCKS5/HTTP，出站强制绑 `tun0`，DNS 走隧道。
 4. 密码哈希格式：`scrypt$16384$8$1$<b64salt>$<b64digest>`（Go 与 Python 完全兼容，见 §12）。
-5. 数据目录布局：`data_dir/` 下 `free-proxy.db`、`configs/`、`logs/`、`web-config.json`、`initial-admin-password`。
+5. 数据目录布局：`data_dir/` 下 `free-proxy.db`、`configs/`、`logs/`；管理配置统一写入数据库。
 
 ---
 
@@ -134,7 +134,7 @@ free-proxy/
 │   ├── tunnel/                     # OpenVPN 生命周期
 │   │   ├── openvpn.go  command.go  process.go  logparse.go
 │   ├── netx/                       # 系统网络操作
-│   │   ├── routing.go  latency.go  upstream.go  tun.go  commands.go
+│   │   ├── routing.go  latency.go  tun.go  commands.go
 │   ├── providers/
 │   │   └── vpngate/                # client.go + parser.go
 │   ├── ipinfo/                     # ip-api.com 批量分类
@@ -565,11 +565,6 @@ func BuildArgs(p BuildParams) []string {
     }
     if fileExists("/etc/ssl/certs") { args = append(args, "--capath", "/etc/ssl/certs") }
     if p.RouteNoPull { args = append(args, "--route-nopull") }
-    if p.Upstream != nil {
-        opt := "--http-proxy"; if p.Upstream.Kind == "socks" { opt = "--socks-proxy" }
-        args = append(args, opt, p.Upstream.Host, strconv.Itoa(p.Upstream.Port))
-        if p.UpstreamAuthFile != "" { args = append(args, p.UpstreamAuthFile) }
-    }
     return args
 }
 ```
@@ -613,7 +608,6 @@ func (m *Managed) Stop() { m.cancel(); _ = m.cmd.Wait() }
 
 - `routing.go`（`PolicyRouter`）：`ip route add default dev tun0 table 100` → `ip rule add oif tun0 table 100` → 读取并设 `net.ipv4.conf.{all,default,tun0}.rp_filter=2`（记录原值以便 `cleanup` 还原）。带重试（`routing_setup_retries` / `routing_retry_interval`）与 `routing_strict_rp_filter` 严格模式。仅 Linux。
 - `latency.go`：`ping` 延迟 + TCP 连接延迟回退，可绑定指定网卡。
-- `upstream.go`：解析 `upstream_proxy_url` / `http_proxy` 等环境变量为 `(kind, host, port, user, pass)`。
 - `tun.go`：`TunAllocator`（见 §8.3）。
 - `commands.go`：`CommandRunner` 接口（`Run(ctx, args) (stdout, stderr, code)`），生产用 `exec`，测试注入假实现——对齐当前用 `Protocol` 抽象命令层的做法。
 
@@ -627,7 +621,7 @@ func (m *Managed) Stop() { m.cancel(); _ = m.cmd.Wait() }
 
 | 服务 | 职责 | Go 关注点 |
 |---|---|---|
-| `DiscoveryService` | VPNGate 拉取+解析+入库 | HTTPS→免校验→HTTP 回退，走上游代理/直连 |
+| `DiscoveryService` | VPNGate 拉取+解析+入库 | HTTPS→免校验→HTTP 直连回退 |
 | `ProbeService` | 并发真实拨号测速 | 信号量 + TunAllocator + `errgroup` |
 | `GatewayService` | 激活/断开出口、组装隧道+路由+代理 | 长任务，经 Job 执行 |
 | `ProxyPoolService` | 按策略筛选可用节点 | 纯函数排序：`auto` 按 latency↑,score↓ |
@@ -734,7 +728,7 @@ func (h *Handlers) RefreshProxies(c echo.Context) error {
 
 ### 12.1 密码哈希（与 Python 完全互通）
 
-`golang.org/x/crypto/scrypt` 与 `hashlib.scrypt` 同算法同参数，输出可互相校验，因此**现有 `web-config.json` 里的哈希无需重置**：
+`golang.org/x/crypto/scrypt` 与 `hashlib.scrypt` 同算法同参数，输出可互相校验，因此旧配置迁入 SQLite 时哈希无需重置：
 
 ```go
 func HashPassword(pw string) (string, error) {
@@ -761,7 +755,7 @@ func VerifyPassword(pw, encoded string) bool {
 ### 12.2 会话与 admin 配置
 
 - `SessionManager`：内存 `map[string]time.Time` + `sync.Mutex`，`token = hex(32 bytes)`，TTL `session_ttl_seconds`。Cookie `session`，`HttpOnly; SameSite=Lax; Path=/<secret>`。与现状同样是内存态（重启失效）——如需持久化可后续加一张 `sessions` 表，不属本次范围。
-- `AdminConfigStore`：读写 `web-config.json`（`0600`，tmp+rename 原子写），生成 `initial-admin-password` 一次性文件，首次登录成功后删除。`random_credential()` 平移（首字符字母 + 大小写数字齐全）。
+- `AdminConfigStore`：读写 SQLite `admin_settings` / `proxy_settings`；旧 `web-config.json` 与一次性密码文件仅在升级时读取一次并删除。首次安装密码只在当前安装进程输出，不落明文文件。`random_credential()` 平移（首字符字母 + 大小写数字齐全）。
 
 ### 12.3 secret-path 中间件（Echo `Pre`）
 
@@ -995,7 +989,7 @@ P5 完成即可用现有 React 前端（改 API base 到 secret-path）联调，
 | `logging.py` | `internal/logging/logging.go` |
 | `infrastructure/database/{models,repositories,connection}.py` | `internal/store/{migrations,queries,gen,repo.go,db.go}` |
 | `infrastructure/tunnel/{openvpn,process,log_parser,command}.py` | `internal/tunnel/*.go` |
-| `infrastructure/network/{routing,latency,upstream,commands,tun}.py` | `internal/netx/*.go` |
+| `infrastructure/network/{routing,latency,commands,tun}.py` | `internal/netx/*.go` |
 | `infrastructure/ipinfo/client.py` | `internal/ipinfo/client.go` |
 | `proxy/{unified,socks5,http,connector,relay,dns,gateway}.py` | `internal/proxy/*.go` |
 | `providers/vpngate/{client,parser}.py` | `internal/providers/vpngate/*.go` |

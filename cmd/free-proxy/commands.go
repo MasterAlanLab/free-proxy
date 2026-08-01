@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/masteralanlab/free-proxy/internal/config"
 	"github.com/masteralanlab/free-proxy/internal/platform"
 	"github.com/masteralanlab/free-proxy/internal/providers/vpngate"
 	"github.com/masteralanlab/free-proxy/internal/security"
@@ -56,15 +58,11 @@ func discoverCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
-			db, err := store.Open(cfg.DatabaseURL)
+			db, repos, err := openAppStore(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
 			defer db.Close()
-			if err := store.Migrate(db); err != nil {
-				return err
-			}
-			repos := store.NewRepos(db)
 			provider := vpngate.NewProvider(cfg)
 			svc := services.NewDiscoveryService(provider, repos.Nodes)
 			res, err := svc.Discover(cmd.Context())
@@ -90,7 +88,12 @@ func credentialsCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
-			adminStore, err := security.NewAdminConfigStore(cfg)
+			db, repos, err := openAppStore(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			adminStore, err := security.NewAdminConfigStore(cfg, repos.App)
 			if err != nil {
 				return err
 			}
@@ -120,7 +123,7 @@ func statusCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
-			db, err := store.Open(cfg.DatabaseURL)
+			db, _, err := openAppStore(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
@@ -153,6 +156,11 @@ func preflightCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
+			db, _, err := openAppStore(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
 			diag := services.NewDiagnosticsService(cfg, nil)
 			result := diag.StartupPreflight(cmd.Context())
 			enc := json.NewEncoder(cmd.OutOrStdout())
@@ -214,7 +222,12 @@ func adminConfigCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
-			adminStore, err := security.NewAdminConfigStore(cfg)
+			db, repos, err := openAppStore(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+			adminStore, err := security.NewAdminConfigStore(cfg, repos.App)
 			if err != nil {
 				return err
 			}
@@ -232,14 +245,8 @@ func adminConfigCmd() *cobra.Command {
 			if v, _ := f.GetString("secret-path"); v != "" {
 				updated.SecretPath = v
 			}
-			if v, _ := f.GetString("host"); v != "" {
-				updated.Host = v
-			}
 			if v, _ := f.GetInt("port"); v != 0 {
 				updated.Port = v
-			}
-			if v, _ := f.GetString("proxy-host"); v != "" {
-				updated.ProxyHost = v
 			}
 			if v, _ := f.GetInt("proxy-port"); v != 0 {
 				updated.ProxyPort = v
@@ -254,9 +261,7 @@ func adminConfigCmd() *cobra.Command {
 	cmd.Flags().String("username", "", "Administrator username")
 	cmd.Flags().String("password", "", "Administrator password")
 	cmd.Flags().String("secret-path", "", "Secret URL path segment")
-	cmd.Flags().String("host", "", "Web bind address")
 	cmd.Flags().Int("port", 0, "Web bind port")
-	cmd.Flags().String("proxy-host", "", "Proxy bind address")
 	cmd.Flags().Int("proxy-port", 0, "Proxy bind port")
 	return cmd
 }
@@ -337,7 +342,8 @@ func installDepsCmd() *cobra.Command {
 }
 
 func installCmd() *cobra.Command {
-	return &cobra.Command{
+	var rotateAdmin bool
+	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Free Proxy on this machine: binary, dependencies, env file, service",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -359,9 +365,8 @@ func installCmd() *cobra.Command {
 			if err := platform.WriteDefaultEnv(); err != nil {
 				return fmt.Errorf("write environment: %w", err)
 			}
-			// Every deployment gets a fresh, random management path + admin
-			// credentials — never a default or a value carried over from a
-			// previous install.
+			// The first install creates database-backed random admin credentials.
+			// Updates preserve them unless rotation was explicitly requested.
 			cfg, err := loadConfig()
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
@@ -369,26 +374,87 @@ func installCmd() *cobra.Command {
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
 			}
-			adminStore, err := security.NewAdminConfigStore(cfg)
+			db, repos, err := openAppStore(ctx, cfg)
+			if err != nil {
+				return fmt.Errorf("open settings database: %w", err)
+			}
+			defer db.Close()
+			adminStore, err := security.NewAdminConfigStore(cfg, repos.App)
 			if err != nil {
 				return fmt.Errorf("admin config: %w", err)
 			}
-			admin, password, err := adminStore.Rotate()
-			if err != nil {
-				return fmt.Errorf("rotate admin credentials: %w", err)
+			if err := platform.PruneDatabaseSettingsEnv(); err != nil {
+				return fmt.Errorf("prune migrated environment: %w", err)
+			}
+			admin := adminStore.Config()
+			password := adminStore.BootstrapPassword()
+			if rotateAdmin {
+				admin, password, err = adminStore.Rotate()
+				if err != nil {
+					return fmt.Errorf("rotate admin credentials: %w", err)
+				}
 			}
 			if err := platform.InstallService(ctx); err != nil {
 				return fmt.Errorf("install service: %w", err)
 			}
 			fmt.Fprintln(out, "Free Proxy installed and started.")
-			fmt.Fprintln(out, "This deployment generated a fresh random management path and admin login:")
+			if rotateAdmin {
+				fmt.Fprintln(out, "Management path and admin login were explicitly rotated:")
+			} else if password != "" {
+				fmt.Fprintln(out, "Management path and admin login (preserved on future updates):")
+			} else {
+				fmt.Fprintln(out, "Existing management path and admin login were preserved:")
+			}
 			fmt.Fprintf(out, "  URL:       http://<your-server-ip>:%d/%s/\n", admin.Port, admin.SecretPath)
 			fmt.Fprintf(out, "  Username:  %s\n", admin.Username)
-			fmt.Fprintf(out, "  Password:  %s\n", password)
-			fmt.Fprintln(out, "Save these now — re-running install rotates them and the password cannot be recovered later.")
+			if password != "" {
+				fmt.Fprintf(out, "  Password:  %s\n", password)
+			} else {
+				fmt.Fprintln(out, "  Password:  [unchanged; cannot be recovered]")
+			}
+			fmt.Fprintln(out, "Future updates keep this path, username, and password unchanged.")
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&rotateAdmin, "rotate-admin", false, "Generate a new random management path, username, and password")
+	return cmd
+}
+
+func openAppStore(ctx context.Context, cfg *config.Config) (*sql.DB, *store.Repos, error) {
+	db, err := store.Open(cfg.DatabaseURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = store.Migrate(db); err != nil {
+		db.Close()
+		return nil, nil, err
+	}
+	repos := store.NewRepos(db)
+	if err = prepareAppSettings(ctx, cfg, repos); err != nil {
+		db.Close()
+		return nil, nil, err
+	}
+	return db, repos, nil
+}
+
+func prepareAppSettings(ctx context.Context, cfg *config.Config, repos *store.Repos) error {
+	var proxyHash string
+	var err error
+	if cfg.ProxyPassword != "" {
+		proxyHash, err = security.HashPassword(cfg.ProxyPassword)
+		if err != nil {
+			return err
+		}
+	}
+	if err = repos.App.InitializeFromLegacyEnv(ctx, cfg, proxyHash); err != nil {
+		return err
+	}
+	settings, err := repos.App.Get(ctx)
+	if err != nil {
+		return err
+	}
+	store.ApplyToConfig(cfg, settings)
+	return nil
 }
 
 func uninstallCmd() *cobra.Command {
@@ -410,4 +476,3 @@ func uninstallCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&purge, "purge-data", false, "Also delete "+platform.DataDir+" (database, logs, configs)")
 	return cmd
 }
-

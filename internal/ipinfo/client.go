@@ -22,7 +22,10 @@ type Client struct {
 
 // New creates a Client.
 func New(apiURL string, timeout time.Duration) *Client {
-	return &Client{apiURL: apiURL, http: &http.Client{Timeout: timeout}}
+	return &Client{apiURL: apiURL, http: &http.Client{
+		Timeout:   timeout,
+		Transport: &http.Transport{},
+	}}
 }
 
 type apiItem struct {

@@ -9,6 +9,33 @@ export interface AccessConfig {
   proxy_auth_configured: boolean;
 }
 
+export interface AppSettings {
+  admin: {
+    username: string; secret_path: string; session_ttl_seconds: number; web_port: number;
+    web_external_access: boolean; password_set: boolean;
+  };
+  proxy: {
+    enabled: boolean; port: number; username: string; external_access: boolean;
+    max_connections: number; connect_timeout_seconds: number; idle_timeout_seconds: number;
+    dns_server: string; password_set: boolean;
+  };
+  discovery: {
+    vpngate_api_url: string; discovery_limit: number; request_timeout_seconds: number;
+    ip_info_api_url: string; ip_info_cache_seconds: number;
+  };
+  maintenance: {
+    enabled: boolean; maintenance_interval_seconds: number; health_check_interval_seconds: number;
+    active_ping_interval_seconds: number; disconnected_retry_seconds: number;
+    max_probe_concurrency: number; initial_connect_test_limit: number; manual_test_node_limit: number;
+    openvpn_test_timeout_seconds: number; openvpn_connect_timeout_seconds: number;
+    invalid_backoff_seconds: number; stale_node_grace_seconds: number;
+  };
+  network: {
+    dns_repair_enabled: boolean; dns_repair_servers: string; routing_setup_retries: number;
+    routing_retry_interval_seconds: number; routing_strict_rp_filter: boolean;
+  };
+}
+
 export interface ProxyNode {
   id: string;
   provider: string;

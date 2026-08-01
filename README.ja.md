@@ -71,16 +71,16 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 **ステップ 3 · 管理 URL とアカウント・パスワードを控える**
 
-インストールスクリプトの完了時に、今回のデプロイでランダム生成されたパス、アカウント、パスワードが**そのまま表示されます**:
+初回インストールの完了時に、ランダム生成されたパス、アカウント、パスワードが**そのまま表示されます**:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 パス、アカウント、パスワードはいずれも**デプロイのたびにランダム生成**され、デフォルト値は一切ありません。その場で必ず保存してください(パスワードは後から復元できません)。後からでも `free-proxy credentials` で再確認できます。
-> ⚠️ インストールを再実行(=更新)するたびにこの認証情報が**再ローテーション**され、古いものは即座に無効になります。
+> 🔑 パス、アカウント、パスワードは**初回インストール時のみ**ランダム生成されます。パスワードは後から復元できないため、その場で保存してください。
+> 🔒 以後の更新では既存のパス、アカウント、パスワードが保持されます。明示的に変更する場合は管理画面または `free-proxy install --rotate-admin` を使用します。
 
 ✅ **完了!** サービスはすでにバックグラウンドで自動的にノード収集・速度測定・接続を行っています。続いて使い方を見ていきましょう。
 
@@ -95,7 +95,7 @@ Password:  xxxxxxxx
 ログイン + ランダムなシークレットパスの二重保護があり、インストール後すぐ外部から開けます。ブラウザで `free-proxy credentials` に表示されたアドレスにアクセスしてください:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 公開アクセスが不要な場合は、管理画面でその外部アクセススイッチをオフにするか、SSH トンネル(下記参照)に切り替えられます。
@@ -104,17 +104,13 @@ http://你的服务器IP:8787/<你的安全路径>/
 
 誰でも使える**「オープンプロキシ」**になってしまうのを防ぐため、プロキシはデフォルトでローカルのみに提供されます。外部から使いたい場合は 2 ステップ:
 
-1. **プロキシパスワードを設定**:`/etc/free-proxy/free-proxy.env` を編集して以下の 2 行を追加し、`systemctl restart free-proxy` を実行します:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
+1. **Configure proxy credentials in the dashboard**: open “Policy → Web and proxy service”, then enter a proxy username and a new password.
 2. **管理画面で有効化**:Web 管理画面の「ポリシー → 外部アクセス」に入り、「プロキシポートの外部アクセスを許可」にチェックを入れて保存します。
 
 その後、ローカルのアプリで使用できます:`socks5://用户名:密码@你的服务器IP:9527`。
 
 > 🔒 最も安全な使い方(公開アクセスを一切開かない):管理画面で Web 管理画面の外部アクセスをオフにし、SSH トンネルに切り替えます——
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP` を実行し、ローカルで `127.0.0.1` にアクセスします。
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP` を実行し、ローカルで `127.0.0.1` にアクセスします。
 
 ### プロキシが有効か検証する
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**最新版へ更新**:上記の「1 行のコマンドでインストール」をもう一度実行するだけです。ノードデータと設定は保持されますが、**管理パス・アカウント・パスワードは再びランダムにローテーション**されます(インストール終了時に新しい 1 セットが表示されるので、必ず保存してください。古いものは即座に無効になります)。
+**最新版へ更新**:上記の「1 行のコマンドでインストール」をもう一度実行するだけです。ノードデータ、設定、管理パス、アカウント、パスワードはすべて保持されます。
 
 ---
 
@@ -209,26 +205,24 @@ free-proxy logs --lines 200      # 打印最近日志
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> リッスンは固定で `0.0.0.0` にバインドされます;外部に公開するかどうかは**管理画面の「外部アクセス」スイッチ**で制御されます(Web 管理画面はデフォルトでオン、プロキシはデフォルトでオフ)。実行時に即時反映され、再起動は不要です。`FREE_PROXY_PROXY_USERNAME` / `PASSWORD` の設定は、プロキシの外部アクセスを有効にする前提条件です。
+> Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
 
 低スペックの VPS(1 コア / 1G など)ではプローブ負荷を下げられます:
 
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+Use the dashboard to lower probe concurrency, discovery limit, and initial test count.
 
 ### API 概要
 

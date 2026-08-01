@@ -25,6 +25,7 @@ type Repos struct {
 	Jobs     *JobRepository
 	Probes   *ProbeResultRepository
 	IPCache  *IPCacheRepository
+	App      *AppSettingsRepository
 }
 
 // NewRepos constructs all repositories bound to db.
@@ -38,6 +39,7 @@ func NewRepos(db *sql.DB) *Repos {
 		Jobs:     &JobRepository{db: db, q: q},
 		Probes:   &ProbeResultRepository{db: db, q: q},
 		IPCache:  &IPCacheRepository{db: db, q: q},
+		App:      &AppSettingsRepository{db: db, root: db},
 	}
 }
 

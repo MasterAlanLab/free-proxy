@@ -71,16 +71,16 @@ El script hará automáticamente: descargar el programa para la arquitectura cor
 
 **Paso 3 · Anota la dirección de administración y el usuario/contraseña**
 
-Cuando el script de instalación termine, **imprimirá directamente** la ruta, el usuario y la contraseña generados aleatoriamente en este despliegue:
+Después de la primera instalación, el script **imprimirá directamente** la ruta, el usuario y la contraseña generados aleatoriamente:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 La ruta, el usuario y la contraseña se **generan aleatoriamente en cada despliegue**, sin ningún valor por defecto; guárdalos en el momento (la contraseña no se puede recuperar después). También puedes volver a verlos con `free-proxy credentials`.
-> ⚠️ Cada vez que vuelvas a ejecutar la instalación (es decir, al actualizar) estas credenciales se **rotan de nuevo**, y las antiguas dejan de servir de inmediato.
+> 🔑 La ruta, el usuario y la contraseña se generan aleatoriamente solo en la **primera instalación**. Guárdalos de inmediato porque la contraseña no se puede recuperar después.
+> 🔒 Las actualizaciones posteriores conservan la ruta, el usuario y la contraseña. Para cambiarlos expresamente, usa el panel o ejecuta `free-proxy install --rotate-admin`.
 
 ✅ **¡Listo!** El servicio ya está en segundo plano obteniendo nodos, midiendo velocidad y conectándose automáticamente. Ahora veamos cómo usarlo.
 
@@ -95,7 +95,7 @@ El servicio escucha por defecto en `0.0.0.0` e incluye un **interruptor de "acce
 Cuenta con doble protección: inicio de sesión + ruta con clave aleatoria, así que puedes abrirlo desde internet nada más instalarlo. Accede en el navegador a la dirección que imprime `free-proxy credentials`:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 Si no necesitas acceso público, puedes desactivar su interruptor de acceso desde internet en el panel, o usar un túnel SSH (ver más abajo).
@@ -104,17 +104,13 @@ Si no necesitas acceso público, puedes desactivar su interruptor de acceso desd
 
 Para evitar convertirse en un **«proxy abierto»** que cualquiera pueda usar, el proxy solo sirve al equipo local por defecto. Para usarlo desde internet, dos pasos:
 
-1. **Configura una contraseña para el proxy**: edita `/etc/free-proxy/free-proxy.env` y añade las dos líneas siguientes, luego `systemctl restart free-proxy`:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
+1. **Configure proxy credentials in the dashboard**: open “Policy → Web and proxy service”, then enter a proxy username and a new password.
 2. **Actívalo en el panel**: entra en «Estrategia → Acceso desde internet» del panel web, marca «Permitir acceso al puerto del proxy desde internet» y guarda.
 
 Después ya puedes usarlo en las aplicaciones de tu equipo local: `socks5://用户名:密码@你的服务器IP:9527`.
 
 > 🔒 El uso más conservador (sin abrir nada al público): desactiva en el panel el acceso desde internet del panel web y usa un túnel SSH en su lugar:
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`, y luego accede localmente a `127.0.0.1`.
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP`, y luego accede localmente a `127.0.0.1`.
 
 ### Verificar si el proxy funciona
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**Actualizar a la última versión**: basta con volver a ejecutar el «comando único de instalación» de arriba. Los datos de los nodos y la configuración se conservan; pero **la ruta de administración, el usuario y la contraseña se vuelven a rotar aleatoriamente** (al terminar la instalación se imprimirá un nuevo conjunto, guárdalo bien, ya que los antiguos dejan de servir de inmediato).
+**Actualizar a la última versión**: basta con volver a ejecutar el «comando único de instalación» de arriba. Se conservan los datos, la configuración, la ruta de administración, el usuario y la contraseña.
 
 ---
 
@@ -209,26 +205,24 @@ En producción, el archivo de configuración es por defecto `/etc/free-proxy/fre
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> La escucha se enlaza siempre a `0.0.0.0`; si se abre o no hacia internet lo controla el **interruptor de «acceso desde internet» del panel** (el panel web abierto por defecto, el proxy cerrado por defecto), con efecto inmediato en tiempo de ejecución y sin reiniciar. Configurar `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` es requisito previo para habilitar el acceso al proxy desde internet.
+> Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
 
 En un "pollito" de configuración débil (por ejemplo 1 núcleo / 1 GB) puedes reducir la carga de sondeo:
 
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+Use the dashboard to lower probe concurrency, discovery limit, and initial test count.
 
 ### Resumen de la API
 

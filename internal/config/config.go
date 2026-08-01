@@ -23,58 +23,61 @@ type Config struct {
 	DatabaseURL string `env:"DATABASE_URL"`
 	SQLEcho     bool   `env:"SQL_ECHO" envDefault:"false"`
 
-	WebHost            string `env:"WEB_HOST" envDefault:"0.0.0.0"`
-	WebPort            int    `env:"WEB_PORT" envDefault:"8787"`
-	AdminAuthEnabled   bool   `env:"ADMIN_AUTH_ENABLED" envDefault:"true"`
-	AdminUsername      string `env:"ADMIN_USERNAME"`
-	AdminPassword      string `env:"ADMIN_PASSWORD"`
-	AdminSecretPath    string `env:"ADMIN_SECRET_PATH"`
-	SessionTTLSeconds  int    `env:"SESSION_TTL_SECONDS" envDefault:"2592000"`
-	AllowProcessRestart bool  `env:"ALLOW_PROCESS_RESTART" envDefault:"true"`
+	// Web/proxy fields keep former env tags solely for one-time upgrade import.
+	// SQLite is authoritative after app_metadata records that import.
+	WebHost             string `env:"WEB_HOST" envDefault:"0.0.0.0"`
+	WebPort             int    `env:"WEB_PORT" envDefault:"39527"`
+	AdminAuthEnabled    bool   `env:"ADMIN_AUTH_ENABLED" envDefault:"true"`
+	AdminUsername       string `env:"ADMIN_USERNAME"`
+	AdminPassword       string `env:"ADMIN_PASSWORD"`
+	AdminSecretPath     string `env:"ADMIN_SECRET_PATH"`
+	SessionTTLSeconds   int    `env:"SESSION_TTL_SECONDS" envDefault:"2592000"`
+	AllowProcessRestart bool   `env:"ALLOW_PROCESS_RESTART" envDefault:"true"`
 
-	ProxyHost                 string  `env:"PROXY_HOST" envDefault:"0.0.0.0"`
-	ProxyPort                 int     `env:"PROXY_PORT" envDefault:"9527"`
-	ProxyEnabled              bool    `env:"PROXY_ENABLED" envDefault:"true"`
-	ProxyUsername             string  `env:"PROXY_USERNAME"`
-	ProxyPassword             string  `env:"PROXY_PASSWORD"`
-	ProxyMaxConnections       int     `env:"PROXY_MAX_CONNECTIONS" envDefault:"256"`
-	ProxyConnectTimeoutSecs   float64 `env:"PROXY_CONNECT_TIMEOUT_SECONDS" envDefault:"20"`
-	ProxyIdleTimeoutSecs      float64 `env:"PROXY_IDLE_TIMEOUT_SECONDS" envDefault:"120"`
-	ProxyDNSServer            string  `env:"PROXY_DNS_SERVER" envDefault:"8.8.8.8"`
-	DNSRepairEnabled          bool    `env:"DNS_REPAIR_ENABLED" envDefault:"false"`
-	DNSRepairServers          string  `env:"DNS_REPAIR_SERVERS" envDefault:"1.1.1.1,8.8.8.8"`
+	ProxyHost               string  `env:"PROXY_HOST" envDefault:"0.0.0.0"`
+	ProxyPort               int     `env:"PROXY_PORT" envDefault:"9527"`
+	ProxyEnabled            bool    `env:"PROXY_ENABLED" envDefault:"true"`
+	ProxyUsername           string  `env:"PROXY_USERNAME"`
+	ProxyPassword           string  `env:"PROXY_PASSWORD"`
+	ProxyMaxConnections     int     `env:"PROXY_MAX_CONNECTIONS" envDefault:"256"`
+	ProxyConnectTimeoutSecs float64 `env:"PROXY_CONNECT_TIMEOUT_SECONDS" envDefault:"20"`
+	ProxyIdleTimeoutSecs    float64 `env:"PROXY_IDLE_TIMEOUT_SECONDS" envDefault:"120"`
+	ProxyDNSServer          string  `env:"PROXY_DNS_SERVER" envDefault:"8.8.8.8"`
+	DNSRepairEnabled        bool    `env:"DNS_REPAIR_ENABLED" envDefault:"false"`
+	DNSRepairServers        string  `env:"DNS_REPAIR_SERVERS" envDefault:"1.1.1.1,8.8.8.8"`
 
-	OpenVPNCommand           string  `env:"OPENVPN_COMMAND" envDefault:"openvpn"`
-	OpenVPNUsername          string  `env:"OPENVPN_USERNAME" envDefault:"vpn"`
-	OpenVPNPassword          string  `env:"OPENVPN_PASSWORD" envDefault:"vpn"`
-	OpenVPNTestTimeoutSecs   float64 `env:"OPENVPN_TEST_TIMEOUT_SECONDS" envDefault:"15"`
+	// Machine-level OpenVPN/TUN values intentionally remain environment-backed.
+	OpenVPNCommand            string  `env:"OPENVPN_COMMAND" envDefault:"openvpn"`
+	OpenVPNUsername           string  `env:"OPENVPN_USERNAME" envDefault:"vpn"`
+	OpenVPNPassword           string  `env:"OPENVPN_PASSWORD" envDefault:"vpn"`
+	OpenVPNTestTimeoutSecs    float64 `env:"OPENVPN_TEST_TIMEOUT_SECONDS" envDefault:"15"`
 	OpenVPNConnectTimeoutSecs float64 `env:"OPENVPN_CONNECT_TIMEOUT_SECONDS" envDefault:"35"`
-	TunnelInterface          string  `env:"TUNNEL_INTERFACE" envDefault:"tun0"`
-	TestTunStart             int     `env:"TEST_TUN_START" envDefault:"2"`
-	TestTunEnd               int     `env:"TEST_TUN_END" envDefault:"99"`
-	MaxProbeConcurrency      int     `env:"MAX_PROBE_CONCURRENCY" envDefault:"5"`
-	PolicyRoutingTable       int     `env:"POLICY_ROUTING_TABLE" envDefault:"100"`
+	TunnelInterface           string  `env:"TUNNEL_INTERFACE" envDefault:"tun0"`
+	TestTunStart              int     `env:"TEST_TUN_START" envDefault:"2"`
+	TestTunEnd                int     `env:"TEST_TUN_END" envDefault:"99"`
+	MaxProbeConcurrency       int     `env:"MAX_PROBE_CONCURRENCY" envDefault:"5"`
+	PolicyRoutingTable        int     `env:"POLICY_ROUTING_TABLE" envDefault:"100"`
 
-	VPNGateAPIURL          string  `env:"VPNGATE_API_URL" envDefault:"https://www.vpngate.net/api/iphone/"`
-	DiscoveryLimit         int     `env:"DISCOVERY_LIMIT" envDefault:"300"`
-	RequestTimeoutSecs     float64 `env:"REQUEST_TIMEOUT_SECONDS" envDefault:"15"`
-	UpstreamProxyURL       string  `env:"UPSTREAM_PROXY_URL"`
-	UpstreamDirectFallback bool    `env:"UPSTREAM_DIRECT_FALLBACK" envDefault:"true"`
-	IPInfoAPIURL           string  `env:"IP_INFO_API_URL" envDefault:"http://ip-api.com/batch?lang=zh-CN&fields=status,message,query,country,regionName,city,isp,org,as,asname,proxy,hosting,mobile"`
-	IPInfoCacheSeconds     int     `env:"IP_INFO_CACHE_SECONDS" envDefault:"604800"`
+	// Discovery fields are legacy import inputs; SQLite overwrites them at run time.
+	VPNGateAPIURL      string  `env:"VPNGATE_API_URL" envDefault:"https://www.vpngate.net/api/iphone/"`
+	DiscoveryLimit     int     `env:"DISCOVERY_LIMIT" envDefault:"300"`
+	RequestTimeoutSecs float64 `env:"REQUEST_TIMEOUT_SECONDS" envDefault:"15"`
+	IPInfoAPIURL       string  `env:"IP_INFO_API_URL" envDefault:"http://ip-api.com/batch?lang=zh-CN&fields=status,message,query,country,regionName,city,isp,org,as,asname,proxy,hosting,mobile"`
+	IPInfoCacheSeconds int     `env:"IP_INFO_CACHE_SECONDS" envDefault:"604800"`
 
-	HealthCheckIntervalSecs   float64 `env:"HEALTH_CHECK_INTERVAL_SECONDS" envDefault:"30"`
-	ActivePingIntervalSecs    float64 `env:"ACTIVE_PING_INTERVAL_SECONDS" envDefault:"10"`
-	MaintenanceIntervalSecs   float64 `env:"MAINTENANCE_INTERVAL_SECONDS" envDefault:"1260"`
-	DisconnectedRetrySecs     float64 `env:"DISCONNECTED_RETRY_SECONDS" envDefault:"30"`
-	MaintenanceEnabled        bool    `env:"MAINTENANCE_ENABLED" envDefault:"true"`
-	InitialConnectTestLimit   int     `env:"INITIAL_CONNECT_TEST_LIMIT" envDefault:"10"`
-	ManualTestNodeLimit       int     `env:"MANUAL_TEST_NODE_LIMIT" envDefault:"5"`
-	InvalidBackoffSeconds     int     `env:"INVALID_BACKOFF_SECONDS" envDefault:"1800"`
-	RoutingSetupRetries       int     `env:"ROUTING_SETUP_RETRIES" envDefault:"3"`
-	RoutingRetryIntervalSecs  float64 `env:"ROUTING_RETRY_INTERVAL_SECONDS" envDefault:"1"`
-	RoutingStrictRPFilter     bool    `env:"ROUTING_STRICT_RP_FILTER" envDefault:"false"`
-	StaleNodeGraceSeconds     int     `env:"STALE_NODE_GRACE_SECONDS" envDefault:"604800"`
+	// Maintenance and network fields are also one-time legacy import inputs.
+	HealthCheckIntervalSecs  float64 `env:"HEALTH_CHECK_INTERVAL_SECONDS" envDefault:"30"`
+	ActivePingIntervalSecs   float64 `env:"ACTIVE_PING_INTERVAL_SECONDS" envDefault:"10"`
+	MaintenanceIntervalSecs  float64 `env:"MAINTENANCE_INTERVAL_SECONDS" envDefault:"10800"`
+	DisconnectedRetrySecs    float64 `env:"DISCONNECTED_RETRY_SECONDS" envDefault:"30"`
+	MaintenanceEnabled       bool    `env:"MAINTENANCE_ENABLED" envDefault:"true"`
+	InitialConnectTestLimit  int     `env:"INITIAL_CONNECT_TEST_LIMIT" envDefault:"10"`
+	ManualTestNodeLimit      int     `env:"MANUAL_TEST_NODE_LIMIT" envDefault:"5"`
+	InvalidBackoffSeconds    int     `env:"INVALID_BACKOFF_SECONDS" envDefault:"1800"`
+	RoutingSetupRetries      int     `env:"ROUTING_SETUP_RETRIES" envDefault:"3"`
+	RoutingRetryIntervalSecs float64 `env:"ROUTING_RETRY_INTERVAL_SECONDS" envDefault:"1"`
+	RoutingStrictRPFilter    bool    `env:"ROUTING_STRICT_RP_FILTER" envDefault:"false"`
+	StaleNodeGraceSeconds    int     `env:"STALE_NODE_GRACE_SECONDS" envDefault:"604800"`
 
 	// PreflightStrict makes `serve` abort when a critical dependency is missing.
 	PreflightStrict bool `env:"PREFLIGHT_STRICT" envDefault:"false"`
@@ -157,11 +160,6 @@ func (c *Config) EnsureDirectories() error {
 
 func (c *Config) ConfigsDir() string { return filepath.Join(c.DataDir, "configs") }
 func (c *Config) LogsDir() string    { return filepath.Join(c.DataDir, "logs") }
-
-// ProxyAuthEnabled reports whether proxy credentials were configured.
-func (c *Config) ProxyAuthEnabled() bool {
-	return c.ProxyUsername != "" || c.ProxyPassword != ""
-}
 
 // ParsedDNSRepairServers returns the trimmed, non-empty DNS repair servers.
 func (c *Config) ParsedDNSRepairServers() []string {

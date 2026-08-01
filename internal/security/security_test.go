@@ -2,10 +2,15 @@ package security
 
 import (
 	"bytes"
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"unicode"
 
+	"github.com/masteralanlab/free-proxy/internal/config"
+	"github.com/masteralanlab/free-proxy/internal/store"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -62,5 +67,91 @@ func TestRandomCredential(t *testing.T) {
 		if strings.IndexFunc(c, unicode.IsLower) < 0 || strings.IndexFunc(c, unicode.IsUpper) < 0 || strings.IndexFunc(c, unicode.IsDigit) < 0 {
 			t.Fatalf("missing character class: %q", c)
 		}
+	}
+}
+
+func TestAdminConfigPersistsAcrossReloads(t *testing.T) {
+	cfg := &config.Config{
+		DataDir: filepath.Join(t.TempDir(), "data"),
+		WebHost: "0.0.0.0", WebPort: 39527,
+		ProxyHost: "0.0.0.0", ProxyPort: 9527,
+	}
+	db, err := store.Open("file:" + filepath.Join(t.TempDir(), "settings.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := store.Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	repos := store.NewRepos(db)
+	first, err := NewAdminConfigStore(cfg, repos.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := first.Config()
+	c.Username = "fixed-user"
+	c.SecretPath = "fixedPath123"
+	c.PasswordHash, err = HashPassword("fixed-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Update(c); err != nil {
+		t.Fatal(err)
+	}
+
+	reloaded, err := NewAdminConfigStore(cfg, repos.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := reloaded.Config()
+	if got.Username != c.Username || got.SecretPath != c.SecretPath || got.PasswordHash != c.PasswordHash {
+		t.Fatalf("credentials changed after reload: got %+v want %+v", got, c)
+	}
+	if !VerifyPassword("fixed-password", got.PasswordHash) {
+		t.Fatal("persisted password hash no longer verifies")
+	}
+}
+
+func TestLegacyWebConfigMigratesToDatabaseAndIsRemoved(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := HashPassword("legacy-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := `{"username":"legacy-user","password_hash":"` + hash + `","secret_path":"legacyPath1","port":8787,"proxy_port":12000,"web_external_access":true,"proxy_external_access":true}`
+	legacyPath := filepath.Join(dataDir, "web-config.json")
+	if err := os.WriteFile(legacyPath, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := store.Open("file:" + filepath.Join(t.TempDir(), "legacy.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := store.Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	repos := store.NewRepos(db)
+	admin, err := NewAdminConfigStore(&config.Config{DataDir: dataDir}, repos.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := admin.Config()
+	if got.Username != "legacy-user" || got.Port != 39527 || got.ProxyPort != 12000 || !got.ProxyExternalAllowed() {
+		t.Fatalf("legacy migration mismatch: %+v", got)
+	}
+	if _, err := os.Stat(legacyPath); !os.IsNotExist(err) {
+		t.Fatal("web-config.json was not removed")
+	}
+	stored, err := repos.App.Get(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Admin.PasswordHash != hash || stored.Proxy.Port != 12000 {
+		t.Fatal("legacy values were not stored in SQLite")
 	}
 }

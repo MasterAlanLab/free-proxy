@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react";
 import * as api from "../api";
-import type { AccessConfig, PolicyMode, ProxySettings, RoutingIpType } from "../types";
+import type { PolicyMode, ProxySettings, RoutingIpType } from "../types";
 import { useUI } from "../store";
 import { Card, Spinner } from "./ui";
+import { SystemConfigPanel } from "./SystemConfigPanel";
 
 export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings | null; onChanged: () => void }) {
   const push = useUI((s) => s.push);
   const [form, setForm] = useState<ProxySettings | null>(settings);
   const [busy, setBusy] = useState(false);
 
-  const [access, setAccess] = useState<AccessConfig | null>(null);
-  const [accessBusy, setAccessBusy] = useState(false);
-
   useEffect(() => setForm(settings), [settings]);
-  useEffect(() => { api.getAccess().then(setAccess).catch(() => {}); }, []);
 
   if (!form) return null;
 
@@ -36,23 +33,6 @@ export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings
       push("error", (e as Error).message);
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function saveAccess() {
-    if (!access) return;
-    setAccessBusy(true);
-    try {
-      const updated = await api.updateAccess({
-        web_external_access: access.web_external_access,
-        proxy_external_access: access.proxy_external_access,
-      });
-      setAccess(updated);
-      push("ok", "外网访问设置已保存（即时生效）");
-    } catch (e) {
-      push("error", (e as Error).message);
-    } finally {
-      setAccessBusy(false);
     }
   }
 
@@ -111,37 +91,7 @@ export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings
         </p>
       </Card>
 
-      <Card
-        title="外网访问"
-        actions={<button className="btn btn-primary" disabled={accessBusy || !access} onClick={saveAccess}>{accessBusy ? <Spinner /> : "保存"}</button>}
-      >
-        {!access ? (
-          <div className="text-sm text-ink-3">加载中…</div>
-        ) : (
-          <div className="grid gap-3">
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={access.web_external_access}
-                onChange={(e) => setAccess({ ...access, web_external_access: e.target.checked })} />
-              <span className="text-sm text-ink-2">允许网页后台外网访问</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={access.proxy_external_access}
-                onChange={(e) => setAccess({ ...access, proxy_external_access: e.target.checked })} />
-              <span className="text-sm text-ink-2">允许代理端口外网访问</span>
-            </label>
-            {access.proxy_external_access && !access.proxy_auth_configured && (
-              <div className="text-xs text-warn">
-                ⚠ 代理外网访问已开启，但尚未设置代理用户名密码——为防止“开放代理”被滥用，外网客户端仍会被拒绝。
-                请先配置 <code>FREE_PROXY_PROXY_USERNAME</code> / <code>FREE_PROXY_PROXY_PASSWORD</code> 并重启后生效。
-              </div>
-            )}
-            <p className="text-xs text-ink-3">
-              监听已绑定 <code>0.0.0.0</code>；本机与 SSH 隧道始终可用，开关即时生效、无需重启。
-              网页后台有登录保护，默认允许外网；代理默认仅限本机，开启外网前请务必设置代理密码。
-            </p>
-          </div>
-        )}
-      </Card>
+      <SystemConfigPanel />
     </div>
   );
 }

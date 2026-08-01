@@ -8,7 +8,6 @@ import (
 
 	"github.com/masteralanlab/free-proxy/internal/config"
 	"github.com/masteralanlab/free-proxy/internal/domain"
-	"github.com/masteralanlab/free-proxy/internal/netx"
 )
 
 func TestFailureCodeClassification(t *testing.T) {
@@ -69,18 +68,6 @@ func TestBuildArgsVersionBranch(t *testing.T) {
 	}
 }
 
-func TestBuildArgsUpstream(t *testing.T) {
-	p := BuildParams{
-		Executable: []string{"openvpn"}, ConfigFile: "/c", AuthFile: "/a", Device: "tun0",
-		Version:  Version{2, 6},
-		Upstream: &netx.UpstreamProxy{Kind: "socks", Host: "127.0.0.1", Port: 1080},
-	}
-	args := BuildArgs(p)
-	if !slices.Contains(args, "--socks-proxy") {
-		t.Errorf("expected --socks-proxy, got %v", args)
-	}
-}
-
 // TestConnectDoesNotDeadlock guards against the regression where Connect held
 // m.mu and then called detectVersion (which also locks m.mu), self-deadlocking
 // before openvpn ever started. With a harmless openvpn command the call must
@@ -102,17 +89,5 @@ func TestConnectDoesNotDeadlock(t *testing.T) {
 	case <-done:
 	case <-time.After(20 * time.Second):
 		t.Fatal("Manager.Connect deadlocked (did not return)")
-	}
-}
-
-func TestIsTCPConfig(t *testing.T) {
-	if !IsTCPConfig("proto tcp\nremote 1.2.3.4 443\n") {
-		t.Error("proto tcp should be TCP")
-	}
-	if IsTCPConfig("proto udp\nremote 1.2.3.4 1194\n") {
-		t.Error("proto udp should not be TCP")
-	}
-	if !IsTCPConfig("remote 1.2.3.4 443 tcp\n") {
-		t.Error("remote ... tcp should be TCP")
 	}
 }

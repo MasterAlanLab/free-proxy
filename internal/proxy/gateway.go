@@ -6,6 +6,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/subtle"
 	"net"
 	"strconv"
 	"sync"
@@ -14,10 +15,15 @@ import (
 
 // Options configures a Gateway.
 type Options struct {
-	Host           string
-	Port           int
-	Username       string
-	Password       string
+	Host     string
+	Port     int
+	Username string
+	Password string
+	// AuthRequired and Authenticate support database-backed credentials without
+	// retaining a recoverable proxy password. Loopback health checks bypass auth
+	// when these callbacks are used; external clients always authenticate.
+	AuthRequired   func() bool
+	Authenticate   func(username, password string) bool
 	MaxConnections int
 	ConnectTimeout time.Duration
 	IdleTimeout    time.Duration
@@ -46,7 +52,22 @@ func New(opts Options, connector OutboundConnector) *Gateway {
 }
 
 func (g *Gateway) authEnabled() bool {
+	if g.opts.AuthRequired != nil {
+		return g.opts.AuthRequired()
+	}
 	return g.opts.Username != "" || g.opts.Password != ""
+}
+
+func (g *Gateway) authenticate(username, password string) bool {
+	if g.opts.Authenticate != nil {
+		return g.opts.Authenticate(username, password)
+	}
+	return subtle.ConstantTimeCompare([]byte(username), []byte(g.opts.Username)) == 1 &&
+		subtle.ConstantTimeCompare([]byte(password), []byte(g.opts.Password)) == 1
+}
+
+func (g *Gateway) requireProtocolAuth(conn net.Conn) bool {
+	return g.authEnabled() && !(g.opts.Authenticate != nil && isLoopbackAddr(conn.RemoteAddr().String()))
 }
 
 // allowClient decides whether to serve a freshly accepted connection. Loopback

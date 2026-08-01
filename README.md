@@ -71,16 +71,16 @@ bash <(curl -Ls https://raw.githubusercontent.com/masteralanlab/free-proxy/main/
 
 **第 3 步 · 记下管理网址和账号密码**
 
-安装脚本跑完时会**直接打印**本次部署随机生成的路径、账号、密码:
+首次安装完成时，脚本会**直接打印**随机生成的路径、账号、密码:
 
 ```text
-URL:       http://<你的服务器IP>:8787/xxxxxxxxxxxx/
+URL:       http://<你的服务器IP>:39527/xxxxxxxxxxxx/
 Username:  xxxxxxxx
 Password:  xxxxxxxx
 ```
 
-> 🔑 路径、账号、密码都是**每次部署随机生成**的,没有任何默认值,请当场保存(密码事后无法找回)。之后也可以用 `free-proxy credentials` 再查看。
-> ⚠️ 每次重新运行安装(也就是更新)都会**重新轮换**这套凭据,旧的立即失效。
+> 🔑 路径、账号、密码仅在**首次安装**时随机生成，没有任何默认值，请当场保存（密码事后无法找回）。
+> 🔒 后续重新运行安装进行更新时会保留原有路径、账号和密码。如需主动更换，可使用后台设置或执行 `free-proxy install --rotate-admin`。
 
 ✅ **搞定!** 服务已经在后台自动抓节点、测速、连接了。接下来看看怎么用。
 
@@ -95,7 +95,7 @@ Password:  xxxxxxxx
 有登录 + 随机密钥路径双重保护,装好即可从外网打开。浏览器访问 `free-proxy credentials` 打印的地址:
 
 ```text
-http://你的服务器IP:8787/<你的安全路径>/
+http://你的服务器IP:39527/<你的安全路径>/
 ```
 
 如无需公网访问,可在后台关闭它的外网开关,或改用 SSH 隧道(见下)。
@@ -104,17 +104,13 @@ http://你的服务器IP:8787/<你的安全路径>/
 
 为避免变成任何人可用的 **「开放代理」**,代理默认只服务本机。想从外网使用,两步:
 
-1. **设置代理密码**:编辑 `/etc/free-proxy/free-proxy.env` 加上下面两行,然后 `systemctl restart free-proxy`:
-   ```text
-   FREE_PROXY_PROXY_USERNAME=自己设一个用户名
-   FREE_PROXY_PROXY_PASSWORD=自己设一个强密码
-   ```
-2. **后台开启**:进入网页后台「策略 → 外网访问」,勾选「允许代理端口外网访问」并保存。
+1. **设置代理凭据**:进入网页后台「策略 → 后台与代理服务」填写代理用户名和新密码。
+2. **后台开启**:勾选「允许代理端口外网访问」并保存。配置写入 SQLite,密码只保存 scrypt 哈希。
 
 之后即可在本机应用里使用:`socks5://用户名:密码@你的服务器IP:9527`。
 
 > 🔒 最保守的用法(完全不开公网):后台关闭网页后台外网访问,改用 SSH 隧道——
-> `ssh -L 8787:127.0.0.1:8787 -L 9527:127.0.0.1:9527 root@你的服务器IP`,然后本地访问 `127.0.0.1`。
+> `ssh -L 39527:127.0.0.1:39527 -L 9527:127.0.0.1:9527 root@你的服务器IP`,然后本地访问 `127.0.0.1`。
 
 ### 验证代理是否生效
 
@@ -145,7 +141,7 @@ free-proxy logs -n 100   # 查看最近日志
 free-proxy uninstall     # 卸载(加 --purge-data 连数据一起删除)
 ```
 
-**更新到最新版**:重新执行一次上面的「一行命令安装」即可。节点数据与设置会保留;但**管理路径、账号、密码会重新随机轮换**(安装结束时会打印新的一套,请注意保存,旧的立即失效)。
+**更新到最新版**:重新执行一次上面的「一行命令安装」即可。节点数据、设置、管理路径、账号和密码都会保留不变。
 
 ---
 
@@ -205,30 +201,26 @@ free-proxy logs --lines 200      # 打印最近日志
 
 ### 配置
 
-生产环境配置文件默认 `/etc/free-proxy/free-proxy.env`(由 `free-proxy install` 生成),环境变量统一 `FREE_PROXY_` 前缀。所有子命令都会自动读取该文件(进程环境变量优先;路径可用 `FREE_PROXY_ENV_FILE` 覆盖)。常用项:
+生产环境配置文件默认 `/etc/free-proxy/free-proxy.env`(由 `free-proxy install` 生成),只保留启动和机器相关配置。后台凭据、代理服务、节点发现、检测维护、DNS 与路由参数统一在网页后台管理并写入 SQLite。升级时旧环境变量和 `web-config.json` 会一次性迁移到数据库,随后移除旧文件和已迁移的环境项。
 
 ```text
 FREE_PROXY_DATA_DIR=/var/lib/free-proxy
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_PROXY_USERNAME=
-FREE_PROXY_PROXY_PASSWORD=
+FREE_PROXY_DATABASE_URL=
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
 FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_UPSTREAM_PROXY_URL=
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 ```
 
-> 监听固定绑定 `0.0.0.0`;是否对外网开放由**后台「外网访问」开关**控制(网页后台默认开、代理默认关),运行时即时生效、无需重启。设置 `FREE_PROXY_PROXY_USERNAME` / `PASSWORD` 是开启代理外网访问的前提。
+> 网页默认端口 `39527`,代理默认端口 `9527`,监听固定绑定 `0.0.0.0`;端口、凭据和外网访问均在后台配置。外网访问开关即时生效,其余运行参数保存后服务自动重启。
 
-弱配置小鸡(如 1 核 / 1G)可调低探测负载:
-
-```text
-FREE_PROXY_MAX_PROBE_CONCURRENCY=2
-FREE_PROXY_DISCOVERY_LIMIT=60
-FREE_PROXY_INITIAL_CONNECT_TEST_LIMIT=5
-```
+弱配置小鸡(如 1 核 / 1G)可在后台调低「探测并发数」「每次发现节点上限」「首次连接检测数」。
 
 ### API 摘要
 

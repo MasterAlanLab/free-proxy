@@ -44,9 +44,6 @@ const (
 func SecretPath(auth *security.AuthService) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			if !auth.Cfg.AdminAuthEnabled {
-				return next(c)
-			}
 			prefix := "/" + auth.Store.Config().SecretPath
 			req := c.Request()
 			p := req.URL.Path

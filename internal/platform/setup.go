@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // System installation layout. The binary owns the whole install lifecycle
@@ -25,14 +26,28 @@ const (
 
 const defaultEnv = `FREE_PROXY_ENVIRONMENT=production
 FREE_PROXY_DATA_DIR=` + DataDir + `
-FREE_PROXY_WEB_HOST=127.0.0.1
-FREE_PROXY_WEB_PORT=8787
-FREE_PROXY_PROXY_HOST=127.0.0.1
-FREE_PROXY_PROXY_PORT=9527
-FREE_PROXY_PROXY_ENABLED=true
-FREE_PROXY_MAINTENANCE_ENABLED=true
-FREE_PROXY_DNS_REPAIR_ENABLED=false
+FREE_PROXY_SQL_ECHO=false
+FREE_PROXY_ALLOW_PROCESS_RESTART=true
+FREE_PROXY_PREFLIGHT_STRICT=false
+FREE_PROXY_OPENVPN_COMMAND=openvpn
+FREE_PROXY_OPENVPN_USERNAME=vpn
+FREE_PROXY_OPENVPN_PASSWORD=vpn
+FREE_PROXY_TUNNEL_INTERFACE=tun0
+FREE_PROXY_TEST_TUN_START=2
+FREE_PROXY_TEST_TUN_END=99
+FREE_PROXY_POLICY_ROUTING_TABLE=100
 `
+
+var infrastructureEnvKeys = map[string]bool{
+	"FREE_PROXY_ENVIRONMENT": true, "FREE_PROXY_DATA_DIR": true,
+	"FREE_PROXY_DATABASE_URL": true, "FREE_PROXY_SQL_ECHO": true,
+	"FREE_PROXY_ALLOW_PROCESS_RESTART": true, "FREE_PROXY_PREFLIGHT_STRICT": true,
+	"FREE_PROXY_OPENVPN_COMMAND": true, "FREE_PROXY_OPENVPN_USERNAME": true,
+	"FREE_PROXY_OPENVPN_PASSWORD": true, "FREE_PROXY_TUNNEL_INTERFACE": true,
+	"FREE_PROXY_TEST_TUN_START": true, "FREE_PROXY_TEST_TUN_END": true,
+	"FREE_PROXY_POLICY_ROUTING_TABLE": true,
+	"FREE_PROXY_ENV_FILE":             true, "FREE_PROXY_REPO": true, "FREE_PROXY_RELEASE": true,
+}
 
 const systemdUnit = `[Unit]
 Description=Free Proxy exit pool and local proxy gateway
@@ -145,6 +160,34 @@ func WriteDefaultEnv() error {
 		return nil
 	}
 	return os.WriteFile(EnvFile, []byte(defaultEnv), 0o600)
+}
+
+// PruneDatabaseSettingsEnv removes legacy settings after their one-time SQLite
+// import. It keeps only machine/bootstrap values that are intentionally outside
+// the web control plane.
+func PruneDatabaseSettingsEnv() error {
+	data, err := os.ReadFile(EnvFile)
+	if err != nil {
+		return err
+	}
+	var kept []string
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			kept = append(kept, line)
+			continue
+		}
+		key, _, ok := strings.Cut(trimmed, "=")
+		if ok && infrastructureEnvKeys[strings.TrimSpace(key)] {
+			kept = append(kept, line)
+		}
+	}
+	out := strings.TrimRight(strings.Join(kept, "\n"), "\n") + "\n"
+	tmp := EnvFile + ".tmp"
+	if err := os.WriteFile(tmp, []byte(out), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, EnvFile)
 }
 
 // InstallService writes the init-system service, enables it, and (re)starts it.
