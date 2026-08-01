@@ -159,11 +159,12 @@ type NodeRepository struct {
 
 // NodeFilter captures the optional list filters exposed by the API.
 type NodeFilter struct {
-	IPType      string
-	Status      string
-	Country     string
-	Search      string
-	CurrentOnly bool
+	IPType       string
+	Status       string
+	Country      string
+	Search       string
+	FavoriteOnly bool
+	CurrentOnly  bool
 }
 
 func (f NodeFilter) where() (string, []any) {
@@ -186,6 +187,9 @@ func (f NodeFilter) where() (string, []any) {
 		clauses = append(clauses,
 			"(ip_address LIKE ? OR host_name LIKE ? OR country LIKE ? OR remote_host LIKE ? OR provider_identity LIKE ?)")
 		args = append(args, like, like, like, like, like)
+	}
+	if f.FavoriteOnly {
+		clauses = append(clauses, "EXISTS (SELECT 1 FROM favorites WHERE favorites.node_id = proxy_nodes.id)")
 	}
 	if f.CurrentOnly {
 		clauses = append(clauses, "source_present = 1")
@@ -344,7 +348,9 @@ func (r *NodeRepository) Delete(ctx context.Context, id string) error {
 	return r.q.DeleteNode(ctx, id)
 }
 
-// Statistics returns pool-wide counts for the dashboard.
+// Statistics returns counts for the current provider snapshot. Historical rows
+// are retained for a grace period, but the proxy list hides them by default, so
+// including them here would make every dashboard count disagree with the list.
 func (r *NodeRepository) Statistics(ctx context.Context) (domain.PoolStatistics, error) {
 	var s domain.PoolStatistics
 	row := r.db.QueryRowContext(ctx, `SELECT
@@ -358,7 +364,8 @@ func (r *NodeRepository) Statistics(ctx context.Context) (domain.PoolStatistics,
 		SUM(CASE WHEN ip_type='hosting' THEN 1 ELSE 0 END),
 		SUM(CASE WHEN ip_type='unknown' THEN 1 ELSE 0 END),
 		COUNT(DISTINCT CASE WHEN country != '' THEN country END)
-		FROM proxy_nodes`)
+		FROM proxy_nodes
+		WHERE source_present = 1`)
 	var ready, disc, unavail, cool, res, mob, host, unk, countries sql.NullInt64
 	var total int64
 	if err := row.Scan(&total, &ready, &disc, &unavail, &cool, &res, &mob, &host, &unk, &countries); err != nil {

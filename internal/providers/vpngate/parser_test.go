@@ -72,3 +72,10 @@ func TestParseResponseLimit(t *testing.T) {
 		t.Fatalf("total rows = %d, want 5", res.Stats.TotalRows)
 	}
 }
+
+func TestParseResponseRejectsTruncatedCSV(t *testing.T) {
+	text := "#IP,CountryShort,OpenVPN_ConfigData_Base64\n\"1.2.3.4,JP,unterminated"
+	if _, err := ParseResponse(text, 60, time.Now()); err == nil {
+		t.Fatal("expected malformed CSV to fail instead of accepting a partial snapshot")
+	}
+}

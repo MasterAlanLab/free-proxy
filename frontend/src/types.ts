@@ -31,6 +31,7 @@ export interface ProxyNode {
   latency_ms: number;
   success_count: number;
   failure_count: number;
+  source_present: boolean;
   last_probed_at: string | null;
   last_success_at: string | null;
 }

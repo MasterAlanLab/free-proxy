@@ -9,10 +9,11 @@ import { SystemPanel } from "./components/SystemPanel";
 import { StatTile, Toasts } from "./components/ui";
 import { useUI } from "./store";
 
-type Tab = "nodes" | "gateway" | "settings" | "system" | "logs";
+type Tab = "nodes" | "favorites" | "gateway" | "settings" | "system" | "logs";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "nodes", label: "节点" },
+  { id: "favorites", label: "收藏" },
   { id: "gateway", label: "网关" },
   { id: "settings", label: "策略" },
   { id: "system", label: "系统" },
@@ -68,11 +69,11 @@ export function App({ onLogout }: { onLogout: () => void }) {
       </header>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
-        <StatTile label="总节点" value={stats?.total ?? "—"} />
-        <StatTile label="可用" value={stats?.ready ?? "—"} />
-        <StatTile label="住宅" value={stats?.residential ?? "—"} />
-        <StatTile label="移动" value={stats?.mobile ?? "—"} />
-        <StatTile label="国家/地区" value={stats?.countries ?? "—"} />
+        <StatTile label="当前节点" value={stats?.total ?? "—"} />
+        <StatTile label="当前可用" value={stats?.ready ?? "—"} />
+        <StatTile label="当前住宅" value={stats?.residential ?? "—"} />
+        <StatTile label="当前移动" value={stats?.mobile ?? "—"} />
+        <StatTile label="当前国家/地区" value={stats?.countries ?? "—"} />
         <StatTile label="黑名单" value={stats?.blacklisted ?? "—"} />
       </div>
 
@@ -82,12 +83,13 @@ export function App({ onLogout }: { onLogout: () => void }) {
             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.id ? "text-ink border-ink" : "text-ink-3 border-transparent hover:text-ink"
             }`}>
-            {t.label}
+            {t.id === "favorites" ? `${t.label} (${settings?.favorite_node_ids.length ?? 0})` : t.label}
           </button>
         ))}
       </nav>
 
       {tab === "nodes" && <NodesPanel settings={settings} onChanged={refresh} />}
+      {tab === "favorites" && <NodesPanel favoriteOnly settings={settings} onChanged={refresh} />}
       {tab === "gateway" && <GatewayPanel status={gateway} onChanged={refresh} />}
       {tab === "settings" && <SettingsPanel settings={settings} onChanged={refresh} />}
       {tab === "system" && <SystemPanel />}

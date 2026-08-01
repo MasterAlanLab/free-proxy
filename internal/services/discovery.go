@@ -69,7 +69,6 @@ func (s *DiscoveryService) Discover(ctx context.Context) (domain.DiscoveryResult
 		Discovered: len(kept),
 		Stored:     stored,
 	}
-	complete := true
 	if sp, ok := s.provider.(parseStatsProvider); ok {
 		total, valid, dup, malformed, missing := sp.ParseStats()
 		result.TotalRows = &total
@@ -77,12 +76,13 @@ func (s *DiscoveryService) Discover(ctx context.Context) (domain.DiscoveryResult
 		result.DuplicateRows = &dup
 		result.MalformedRows = &malformed
 		result.MissingFieldRows = &missing
-		complete = malformed == 0 && missing == 0
 	}
-	if complete {
-		if err := s.nodes.MarkProviderSnapshot(ctx, s.provider.Name(), identities); err != nil {
-			return domain.DiscoveryResult{}, err
-		}
+	// A successful provider response is an authoritative snapshot of the usable
+	// nodes returned by that provider. Malformed or incomplete individual rows
+	// are intentionally excluded from the current pool; keeping the previous
+	// snapshot current would otherwise make the visible pool grow forever.
+	if err := s.nodes.MarkProviderSnapshot(ctx, s.provider.Name(), identities); err != nil {
+		return domain.DiscoveryResult{}, err
 	}
 	slog.Info("discovery complete", "module", "discovery", "discovered", result.Discovered, "stored", result.Stored)
 	return result, nil

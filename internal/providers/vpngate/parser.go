@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -148,8 +150,11 @@ func ParseResponse(text string, limit int, now time.Time) (ParseResult, error) {
 	seen := map[string]bool{}
 	for {
 		row, err := reader.Read()
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			break
+		}
+		if err != nil {
+			return ParseResult{}, fmt.Errorf("VPNGate CSV row unreadable: %w", err)
 		}
 		result.Stats.TotalRows++
 		if len(result.Nodes) >= limit {

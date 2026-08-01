@@ -126,7 +126,8 @@ func (h *Handlers) ListProxies(c *echo.Context) error {
 	filter := store.NodeFilter{
 		IPType: c.QueryParam("ip_type"), Status: c.QueryParam("status"),
 		Country: c.QueryParam("country"), Search: c.QueryParam("search"),
-		CurrentOnly: !includeHistory,
+		FavoriteOnly: c.QueryParam("favorite") == "true",
+		CurrentOnly:  !includeHistory,
 	}
 	ctx := c.Request().Context()
 	items, err := h.Deps.Repos.Nodes.ListNodes(ctx, filter, limit, offset)

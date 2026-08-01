@@ -6,7 +6,11 @@ import { Badge, Card, Spinner } from "./ui";
 
 const PAGE = 20;
 
-export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | null; onChanged: () => void }) {
+export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
+  settings: ProxySettings | null;
+  onChanged: () => void;
+  favoriteOnly?: boolean;
+}) {
   const push = useUI((s) => s.push);
   const [items, setItems] = useState<ProxyNode[]>([]);
   const [total, setTotal] = useState(0);
@@ -14,6 +18,7 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
   const [search, setSearch] = useState("");
   const [ipType, setIpType] = useState("");
   const [status, setStatus] = useState("");
+  const [includeHistory, setIncludeHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState("");
@@ -25,6 +30,8 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
     try {
       const res = await api.listProxies({
         limit: PAGE, offset: page * PAGE, search, ip_type: ipType, status,
+        favorite: favoriteOnly,
+        include_history: favoriteOnly || includeHistory,
       });
       setItems(res.items);
       setTotal(res.total);
@@ -33,7 +40,7 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
     } finally {
       setLoading(false);
     }
-  }, [page, search, ipType, status, push]);
+  }, [page, search, ipType, status, includeHistory, favoriteOnly, push]);
 
   useEffect(() => {
     load();
@@ -56,7 +63,16 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
 
   async function favorite(id: string) {
     try {
-      await api.toggleFavorite(id);
+      const updated = await api.toggleFavorite(id);
+      const kept = updated.favorite_node_ids.includes(id);
+      push("ok", kept ? "已加入收藏" : "已取消收藏");
+      if (!kept) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
       onChanged();
       await load();
     } catch (e) {
@@ -73,18 +89,24 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
 
   const pages = Math.max(1, Math.ceil(total / PAGE));
 
+  useEffect(() => {
+    if (page >= pages && page > 0) setPage(pages - 1);
+  }, [page, pages]);
+
   return (
     <Card
-      title={`节点池（${total}）`}
+      title={`${favoriteOnly ? "收藏节点" : includeHistory ? "全部节点记录" : "当前节点池"}（${total}）`}
       actions={
         <>
-          <button className="btn btn-primary" disabled={!!busy}
-            onClick={() => runJob("更新并检测", api.refresh)}>
-            {busy === "更新并检测" ? <Spinner /> : "更新并检测节点"}
-          </button>
-          <button className="btn" disabled={!!busy} onClick={() => runJob("发现节点", api.discover)}>
-            {busy === "发现节点" ? <Spinner /> : "仅发现"}
-          </button>
+          {!favoriteOnly && <>
+            <button className="btn btn-primary" disabled={!!busy}
+              onClick={() => runJob("更新并检测", api.refresh)}>
+              {busy === "更新并检测" ? <Spinner /> : "更新并检测节点"}
+            </button>
+            <button className="btn" disabled={!!busy} onClick={() => runJob("发现节点", api.discover)}>
+              {busy === "发现节点" ? <Spinner /> : "仅发现"}
+            </button>
+          </>}
           <button className="btn" disabled={!!busy || selected.size === 0}
             onClick={() => runJob("测试节点", () => api.probeMany([...selected]))}
             title="测试节点是否能连接，并记录实际延迟">
@@ -110,10 +132,22 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
           <option value="unavailable">不可用</option>
           <option value="cooldown">冷却</option>
         </select>
+        {!favoriteOnly && <label className="flex items-center gap-2 px-2 text-sm text-ink-2 whitespace-nowrap">
+          <input type="checkbox" checked={includeHistory}
+            onChange={(e) => { setPage(0); setIncludeHistory(e.target.checked); }} />
+          包含历史节点
+        </label>}
         <button className="btn" onClick={load} disabled={loading}>{loading ? <Spinner /> : "刷新"}</button>
       </div>
 
       <p className="text-xs text-ink-3 mb-3">
+        {favoriteOnly ? <>
+          这里包含全部收藏记录；标记为“历史”的节点已不在最新来源快照中，可以先测试确认后再切换。
+          取消收藏后节点会从本页移除。
+        </> : <>
+          默认只显示来源最近一次快照，每页 {PAGE} 条；总数受 FREE_PROXY_DISCOVERY_LIMIT 上限和来源实时节点数影响。
+          历史节点仅为宽限期内保留的旧记录。
+        </>}
         “切换节点”会立即使用该节点，并自动改为固定节点；“测试节点”只检查连接和延迟，不会切换当前节点。
       </p>
       <div className="overflow-x-auto rounded-md border border-rule">
@@ -135,13 +169,14 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
           <tbody>
             {items.length === 0 && (
               <tr><td className="td text-center text-ink-3 py-8" colSpan={10}>
-                {loading ? "加载中…" : "暂无节点，点击“更新并检测节点”开始。"}
+                {loading ? "加载中…" : favoriteOnly ? "暂无收藏节点，请先在节点页面收藏常用节点。" : "暂无节点，点击“更新并检测节点”开始。"}
               </td></tr>
             )}
             {items.map((n) => (
-              <tr key={n.id} className="hover:bg-paper-2/50">
+              <tr key={n.id} className={`hover:bg-paper-2/50 ${n.source_present ? "" : "opacity-60"}`}>
                 <td className="td">
-                  <input type="checkbox" checked={selected.has(n.id)} onChange={() => toggleSel(n.id)} />
+                  <input type="checkbox" disabled={!favoriteOnly && !n.source_present}
+                    checked={selected.has(n.id)} onChange={() => toggleSel(n.id)} />
                 </td>
                 <td className="td">
                   <div className="font-medium">{n.country || n.country_code || "—"}</div>
@@ -151,24 +186,25 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
                 </td>
                 <td className="td font-mono text-[0.8rem]">{n.ip_address}<div className="text-xs text-ink-3 font-sans">{n.transport}</div></td>
                 <td className="td"><Badge label={ipLabel(n.ip_type)} tone={n.ip_type} /></td>
-                <td className="td"><Badge label={statusLabel(n.status)} tone={n.status} /></td>
+                <td className="td"><Badge label={n.source_present ? statusLabel(n.status) : "历史"}
+                  tone={n.source_present ? n.status : "unknown"} /></td>
                 <td className="td tabular-nums">{n.latency_ms > 0 ? `${n.latency_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_ping_ms > 0 ? `${n.source_ping_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{formatSpeed(n.source_speed_bps)}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_sessions}</td>
                 <td className="td text-right whitespace-nowrap">
-                  <button className="btn btn-sm btn-primary mr-1" disabled={!!busy}
+                  <button className="btn btn-sm btn-primary mr-1" disabled={!!busy || (!favoriteOnly && !n.source_present)}
                     onClick={() => runJob("切换节点", () => api.activate(n.id))}
                     title="切换到此节点，并锁定为固定节点">
                     切换节点
                   </button>
-                  <button className="btn btn-sm mr-1" disabled={!!busy}
+                  <button className="btn btn-sm mr-1" disabled={!!busy || (!favoriteOnly && !n.source_present)}
                     onClick={() => runJob("测试节点", () => api.probeOne(n.id))}
                     title="测试此节点是否能连接，并记录实际延迟">
                     测试节点
                   </button>
                   <button className="btn btn-sm mr-1" onClick={() => favorite(n.id)}>
-                    {favorites.has(n.id) ? "★" : "☆"}
+                    {favoriteOnly ? "取消收藏" : favorites.has(n.id) ? "★" : "☆"}
                   </button>
                   <a className="btn btn-sm" href={api.configUrl(n.id)}>下载</a>
                 </td>
@@ -179,7 +215,10 @@ export function NodesPanel({ settings, onChanged }: { settings: ProxySettings | 
       </div>
 
       <div className="flex items-center justify-between mt-4 text-sm text-ink-3">
-        <span>第 {page + 1} / {pages} 页</span>
+        <span>
+          第 {page + 1} / {pages} 页
+          {total > 0 && ` · 当前显示 ${page * PAGE + 1}–${Math.min((page + 1) * PAGE, total)}，共 ${total} 个`}
+        </span>
         <div className="flex gap-2">
           <button className="btn btn-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>上一页</button>
           <button className="btn btn-sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>下一页</button>
