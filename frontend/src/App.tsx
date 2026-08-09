@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "./api";
 import type { GatewayStatus, PoolStatistics, ProxySettings } from "./types";
 import { GatewayPanel } from "./components/GatewayPanel";
@@ -26,10 +26,15 @@ export function App({ onLogout }: { onLogout: () => void }) {
   const [gateway, setGateway] = useState<GatewayStatus | null>(null);
   const [stats, setStats] = useState<PoolStatistics | null>(null);
   const [settings, setSettings] = useState<ProxySettings | null>(null);
+  const refreshSequence = useRef(0);
 
   const refresh = useCallback(async () => {
+    const sequence = ++refreshSequence.current;
     try {
       const [g, s, cfg] = await Promise.all([api.gatewayStatus(), api.poolStats(), api.getSettings()]);
+      // A manual refresh can be started while the periodic refresh is still in
+      // flight. Do not let the older response overwrite newer server state.
+      if (sequence !== refreshSequence.current) return;
       setGateway(g);
       setStats(s);
       setSettings(cfg);

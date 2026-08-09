@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as api from "../api";
 import type { PolicyMode, ProxySettings, RoutingIpType } from "../types";
 import { useUI } from "../store";
@@ -9,24 +9,40 @@ export function SettingsPanel({ settings, onChanged }: { settings: ProxySettings
   const push = useUI((s) => s.push);
   const [form, setForm] = useState<ProxySettings | null>(settings);
   const [busy, setBusy] = useState(false);
+  const dirty = useRef(false);
 
-  useEffect(() => setForm(settings), [settings]);
+  useEffect(() => {
+    if (!settings) return;
+    setForm((current) => {
+      if (!dirty.current || !current) return settings;
+
+      // The application polls settings every eight seconds. Keep the user's
+      // unsaved policy fields while still reflecting favorite changes made in
+      // another panel.
+      return { ...current, favorite_node_ids: settings.favorite_node_ids };
+    });
+  }, [settings]);
 
   if (!form) return null;
 
-  const set = (patch: Partial<ProxySettings>) => setForm({ ...form, ...patch });
+  const set = (patch: Partial<ProxySettings>) => {
+    dirty.current = true;
+    setForm((current) => current ? { ...current, ...patch } : current);
+  };
 
   async function save() {
     if (!form) return;
     setBusy(true);
     try {
-      await api.updateSettings({
+      const saved = await api.updateSettings({
         routing_mode: form.routing_mode,
         force_country: form.force_country,
         routing_ip_type: form.routing_ip_type,
         connection_enabled: form.connection_enabled,
         fixed_node_id: form.fixed_node_id,
       });
+      dirty.current = false;
+      setForm(saved);
       push("ok", "策略已保存");
       onChanged();
     } catch (e) {
