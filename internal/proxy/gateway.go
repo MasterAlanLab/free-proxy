@@ -20,15 +20,21 @@ type Options struct {
 	Username string
 	Password string
 	// AuthRequired and Authenticate support database-backed credentials without
-	// retaining a recoverable proxy password. Loopback health checks bypass auth
-	// when these callbacks are used; external clients always authenticate.
-	AuthRequired   func() bool
-	Authenticate   func(username, password string) bool
-	MaxConnections int
-	ConnectTimeout time.Duration
-	IdleTimeout    time.Duration
+	// retaining a recoverable proxy password. When auth is configured, every
+	// client authenticates regardless of whether it connects via loopback or a
+	// non-loopback address.
+	AuthRequired func() bool
+	Authenticate func(username, password string) bool
+	// InternalAuthenticate is an optional second credential verifier restricted
+	// to loopback connections. It lets in-process monitoring authenticate without
+	// storing or recovering the user's plaintext password.
+	InternalAuthenticate func(username, password string) bool
+	MaxConnections       int
+	ConnectTimeout       time.Duration
+	IdleTimeout          time.Duration
 	// ExternalAllowed reports (at call time) whether non-loopback clients may use
-	// the proxy. nil denies external access. Loopback clients are always served.
+	// the proxy. nil denies external access. Loopback clients always reach protocol
+	// handling, where the same configured authentication policy is enforced.
 	ExternalAllowed func() bool
 }
 
@@ -58,7 +64,11 @@ func (g *Gateway) authEnabled() bool {
 	return g.opts.Username != "" || g.opts.Password != ""
 }
 
-func (g *Gateway) authenticate(username, password string) bool {
+func (g *Gateway) authenticate(conn net.Conn, username, password string) bool {
+	if isLoopbackAddr(conn.RemoteAddr().String()) && g.opts.InternalAuthenticate != nil &&
+		g.opts.InternalAuthenticate(username, password) {
+		return true
+	}
 	if g.opts.Authenticate != nil {
 		return g.opts.Authenticate(username, password)
 	}
@@ -66,13 +76,12 @@ func (g *Gateway) authenticate(username, password string) bool {
 		subtle.ConstantTimeCompare([]byte(password), []byte(g.opts.Password)) == 1
 }
 
-func (g *Gateway) requireProtocolAuth(conn net.Conn) bool {
-	return g.authEnabled() && !(g.opts.Authenticate != nil && isLoopbackAddr(conn.RemoteAddr().String()))
-}
+func (g *Gateway) requireProtocolAuth() bool { return g.authEnabled() }
 
-// allowClient decides whether to serve a freshly accepted connection. Loopback
-// clients are always served; external clients require the runtime toggle to be
-// on AND proxy auth to be configured, so the proxy is never an open relay.
+// allowClient decides whether to admit a freshly accepted connection to protocol
+// handling. Loopback clients are admitted regardless of the exposure toggle but
+// still authenticate when credentials are configured. External clients require
+// the toggle to be on AND proxy auth to be configured, preventing an open relay.
 func (g *Gateway) allowClient(conn net.Conn) bool {
 	if isLoopbackAddr(conn.RemoteAddr().String()) {
 		return true

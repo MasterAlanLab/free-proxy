@@ -117,7 +117,7 @@ func (g *Gateway) socksAuth(br *bufio.Reader, conn net.Conn) bool {
 	if _, err := io.ReadFull(br, pass); err != nil {
 		return false
 	}
-	ok := g.authenticate(string(user), string(pass))
+	ok := g.authenticate(conn, string(user), string(pass))
 	if ok {
 		_, _ = conn.Write([]byte{0x01, 0x00})
 		return true

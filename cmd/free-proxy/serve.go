@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"net"
@@ -43,6 +44,12 @@ func buildDeps(ctx context.Context, cfg *config.Config, repos *store.Repos, auth
 	})
 
 	adminCfg := auth.Store.Config()
+	// The persisted proxy password is deliberately non-recoverable. Give the
+	// in-process health checker an ephemeral credential so it exercises the same
+	// authenticated listener as every other client without weakening loopback
+	// authentication. These values exist only for this process lifetime.
+	healthUsername := security.RandomCredential(32)
+	healthPassword := security.RandomCredential(32)
 	connector := proxy.NewSocketConnector(cfg.TunnelInterface, cfg.ProxyDNSServer, cfg.ProxyConnectTimeout())
 	proxyGateway := proxy.New(proxy.Options{
 		Host: "0.0.0.0", Port: adminCfg.ProxyPort,
@@ -50,11 +57,18 @@ func buildDeps(ctx context.Context, cfg *config.Config, repos *store.Repos, auth
 		ConnectTimeout: cfg.ProxyConnectTimeout(), IdleTimeout: cfg.ProxyIdleTimeout(),
 		AuthRequired: func() bool {
 			s, err := repos.App.Get(context.Background())
-			return err == nil && s.Proxy.Username != "" && s.Proxy.PasswordHash != ""
+			// Fail closed on a database read error. The internal health credential
+			// remains usable so monitoring does not trigger a false recovery.
+			return err != nil || s.Proxy.Username != "" && s.Proxy.PasswordHash != ""
 		},
 		Authenticate: func(username, password string) bool {
 			s, err := repos.App.Get(context.Background())
 			return err == nil && username == s.Proxy.Username && security.VerifyPassword(password, s.Proxy.PasswordHash)
+		},
+		InternalAuthenticate: func(username, password string) bool {
+			healthUserOK := subtle.ConstantTimeCompare([]byte(username), []byte(healthUsername))
+			healthPasswordOK := subtle.ConstantTimeCompare([]byte(password), []byte(healthPassword))
+			return healthUserOK&healthPasswordOK == 1
 		},
 		// Listener binds all interfaces; non-loopback clients are gated at runtime
 		// by the admin toggle (default off) and still require proxy auth.
@@ -66,7 +80,7 @@ func buildDeps(ctx context.Context, cfg *config.Config, repos *store.Repos, auth
 	autoSwitch := services.NewAutoSwitchService(cfg, repos.Nodes, repos.Settings, pool, gateway)
 	gateway.SetUnexpectedExitHandler(autoSwitch.HandleUnexpectedExit)
 
-	healthChecker := netx.NewHealthChecker(adminCfg.ProxyHost, adminCfg.ProxyPort, "", "", cfg.ProxyConnectTimeout())
+	healthChecker := netx.NewHealthChecker(adminCfg.ProxyHost, adminCfg.ProxyPort, healthUsername, healthPassword, cfg.ProxyConnectTimeout())
 	health := services.NewHealthService(cfg, healthChecker, repos.Nodes, repos.Settings, gateway, autoSwitch)
 	settingsSvc := services.NewSettingsService(repos.Nodes, repos.Settings, pool, gateway, autoSwitch, coordinator)
 

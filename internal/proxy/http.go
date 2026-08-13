@@ -16,7 +16,7 @@ func (g *Gateway) serveHTTP(ctx context.Context, conn net.Conn, br *bufio.Reader
 		return
 	}
 
-	if requireAuth && !g.httpAuthOK(req) {
+	if requireAuth && !g.httpAuthOK(conn, req) {
 		_, _ = conn.Write([]byte(
 			"HTTP/1.1 407 Proxy Authentication Required\r\n" +
 				"Proxy-Authenticate: Basic realm=\"free-proxy\"\r\n" +
@@ -74,7 +74,7 @@ func (g *Gateway) httpForward(ctx context.Context, conn net.Conn, req *http.Requ
 	_, _ = io.Copy(conn, targetConn)
 }
 
-func (g *Gateway) httpAuthOK(req *http.Request) bool {
+func (g *Gateway) httpAuthOK(conn net.Conn, req *http.Request) bool {
 	const prefix = "Basic "
 	h := req.Header.Get("Proxy-Authorization")
 	if !strings.HasPrefix(h, prefix) {
@@ -88,7 +88,7 @@ func (g *Gateway) httpAuthOK(req *http.Request) bool {
 	if !ok {
 		return false
 	}
-	return g.authenticate(user, pass)
+	return g.authenticate(conn, user, pass)
 }
 
 func splitHostPort(hostport string, defPort int) (string, int) {
