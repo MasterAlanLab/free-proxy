@@ -4,8 +4,10 @@
 
 > 海外の格安 VPS 上で **1 行のコマンド** を実行するだけで、公開ノードソース(VPNGate)から数百の無料出口ノードを自動収集し、実際に速度を測定して最速の回線をスマートに選び、安定した **SOCKS5 / HTTP プロキシ** を提供します。ノードが切断されても自動で切り替わり、常に監視する必要はありません。
 
+> 🎥 デモ動画: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
-  <img alt="ワンコマンドデプロイ" src="https://img.shields.io/badge/%E3%83%87%E3%83%97%E3%83%AD%E3%82%A4-1%E8%A1%8C%E3%81%AE%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89-brightgreen">
+  <img alt="ワンコマンドデプロイ" src="https://img.shields.io/badge/%E3%83%87%E3%83%97%E3%83%AD%E3%82%A4-1%E8%A1%8C%E3%83%9E%E3%83%B3%E3%83%89-brightgreen">
   <img alt="Go 単一バイナリ" src="https://img.shields.io/badge/Go-%E5%8D%98%E4%B8%80%E3%83%90%E3%82%A4%E3%83%8A%E3%83%AA%C2%B7%E4%BE%9D%E5%AD%98%E3%81%AA%E3%81%97-00ADD8">
   <img alt="無料" src="https://img.shields.io/badge/%E3%83%8E%E3%83%BC%E3%83%89-%E7%84%A1%E6%96%99%C2%B7%E8%87%AA%E5%8B%95%E9%80%9F%E5%BA%A6%E6%B8%AC%E5%AE%9A-orange">
 </p>

@@ -4,6 +4,8 @@
 
 > Esegui **un solo comando** su un piccolo VPS all'estero: recupererà automaticamente centinaia di uscite gratuite da fonti pubbliche di nodi (VPNGate), con test di velocità reali e selezione intelligente della linea più veloce, offrendo verso l'esterno un **proxy SOCKS5 / HTTP** stabile. Quando un nodo cade, passa automaticamente a un altro, senza che tu debba mai stare a controllare.
 
+> 🎥 Video dimostrativo: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="Distribuzione con un comando" src="https://img.shields.io/badge/Distribuzione-un%20comando-brightgreen">
   <img alt="Go binario unico" src="https://img.shields.io/badge/Go-binario%20unico·zero%20dipendenze-00ADD8">

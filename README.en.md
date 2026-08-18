@@ -4,6 +4,8 @@
 
 > Run **a single command** on an overseas VPS and it automatically pulls hundreds of free exit nodes from public sources (VPNGate), runs real speed tests, intelligently picks the fastest routes, and exposes a stable **SOCKS5 / HTTP proxy**. When a node drops, it switches automatically — no babysitting required.
 
+> 🎥 Demo video: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="One-command deploy" src="https://img.shields.io/badge/Deploy-One%20Command-brightgreen">
   <img alt="Go single binary" src="https://img.shields.io/badge/Go-Single%20Binary·Zero%20Deps-00ADD8">

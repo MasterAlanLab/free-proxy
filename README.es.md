@@ -4,6 +4,8 @@
 
 > Ejecuta **un solo comando** en un pequeño VPS en el extranjero y automáticamente obtiene cientos de salidas gratuitas desde fuentes públicas de nodos (VPNGate), mide su velocidad de forma real, elige de manera inteligente la ruta más rápida y ofrece hacia el exterior un **proxy SOCKS5 / HTTP** estable. Si un nodo se cae, cambia solo, sin que tengas que estar pendiente.
 
+> 🎥 Video de demostración: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="Despliegue con un comando" src="https://img.shields.io/badge/Despliegue-un%20comando-brightgreen">
   <img alt="Go binario único" src="https://img.shields.io/badge/Go-binario%20único·sin%20dependencias-00ADD8">

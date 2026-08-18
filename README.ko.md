@@ -4,6 +4,8 @@
 
 > 해외 VPS 한 대에서 **명령어 한 줄**만 실행하면, 공개 노드 소스(VPNGate)에서 수백 개의 무료 출구를 자동으로 수집하고, 실제로 속도를 측정한 뒤, 가장 빠른 회선을 지능적으로 선택해 안정적인 **SOCKS5 / HTTP 프록시**를 제공합니다. 노드가 끊기면 자동으로 전환되며, 계속 지켜볼 필요가 전혀 없습니다.
 
+> 🎥 데모 영상: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="원클릭 배포" src="https://img.shields.io/badge/배포-명령어_한_줄-brightgreen">
   <img alt="Go 단일 바이너리" src="https://img.shields.io/badge/Go-단일_바이너리·의존성_제로-00ADD8">

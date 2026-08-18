@@ -4,6 +4,8 @@
 
 > Führe auf einem kleinen Server im Ausland **einen einzigen Befehl** aus: Er zieht automatisch Hunderte kostenlose Ausgänge aus öffentlichen Knotenquellen (VPNGate), misst deren Geschwindigkeit in Echtzeit, wählt intelligent die schnellste Route und stellt nach außen einen stabilen **SOCKS5- / HTTP-Proxy** bereit. Fällt ein Knoten aus, wird automatisch umgeschaltet — du musst nichts überwachen.
 
+> 🎥 Demo-Video: [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="Bereitstellung mit einem Befehl" src="https://img.shields.io/badge/Bereitstellung-Ein%20Befehl-brightgreen">
   <img alt="Go Einzelbinary" src="https://img.shields.io/badge/Go-Einzelbinary%C2%B7ohne%20Abh%C3%A4ngigkeiten-00ADD8">

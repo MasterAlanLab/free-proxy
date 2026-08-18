@@ -4,6 +4,8 @@
 
 > 在海外 Linux VPS 上运行安装脚本，从公开节点源（VPNGate）获取免费出口，完成连通性检测和延迟测试后选择可用线路，并提供 **SOCKS5 / HTTP 代理**。节点不可用时，服务会自动重连或切换。
 
+> 🎥 视频演示： [YouTube](https://youtu.be/0uf9St0cBM8)
+
 <p>
   <img alt="一键部署" src="https://img.shields.io/badge/部署-一行命令-brightgreen">
   <img alt="Go 单二进制" src="https://img.shields.io/badge/Go-单二进制·零依赖-00ADD8">
