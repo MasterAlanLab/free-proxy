@@ -3,6 +3,7 @@
 package tunnel
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/masteralanlab/free-proxy/internal/domain"
@@ -75,24 +76,39 @@ func hasFatalConfigError(lines []string) bool {
 	return false
 }
 
+var failureMessages = map[domain.TunnelFailureCode]string{
+	domain.FailTunUnavailable:    "TUN device is unavailable or not permitted",
+	domain.FailAuthFailed:        "The public node rejected authentication",
+	domain.FailDNSFailed:         "The public node address could not be resolved",
+	domain.FailTLSFailed:         "OpenVPN TLS negotiation failed",
+	domain.FailPermissionDenied:  "OpenVPN requires elevated network permissions",
+	domain.FailConfigError:       "The OpenVPN configuration contains an invalid option",
+	domain.FailConnectionRefused: "The public node refused the connection",
+	domain.FailUnreachable:       "The public node is unreachable",
+	domain.FailTimeout:           "OpenVPN connection timed out",
+	domain.FailUnknown:           "OpenVPN failed before the tunnel became ready",
+}
+
 // FailureMessage returns a human-readable message for the classified failure.
-func FailureMessage(lines []string) string {
-	messages := map[domain.TunnelFailureCode]string{
-		domain.FailTunUnavailable:   "TUN device is unavailable or not permitted",
-		domain.FailAuthFailed:       "The public node rejected authentication",
-		domain.FailDNSFailed:        "The public node address could not be resolved",
-		domain.FailTLSFailed:        "OpenVPN TLS negotiation failed",
-		domain.FailPermissionDenied: "OpenVPN requires elevated network permissions",
-		domain.FailConfigError:      "The OpenVPN configuration contains an invalid option",
-		domain.FailConnectionRefused: "The public node refused the connection",
-		domain.FailUnreachable:      "The public node is unreachable",
-		domain.FailTimeout:          "OpenVPN connection timed out",
-		domain.FailUnknown:          "OpenVPN failed before the tunnel became ready",
+func FailureMessage(lines []string) string { return FailureMessageFor(lines, "") }
+
+// FailureMessageFor is FailureMessage with the device name in hand.
+//
+// A bare "TUN device is unavailable or not permitted" (see issue #2) is the
+// hardest failure to act on, because it does not say *which* device or that a
+// name collision with another program is the likely cause. When we know the
+// device, say so and point at the setting that moves us out of the way.
+func FailureMessageFor(lines []string, device string) string {
+	code := FailureCode(lines)
+	if code == domain.FailTunUnavailable && device != "" {
+		return fmt.Sprintf("TUN device %s could not be created: the name may already be taken by another program "+
+			"(3x-ui, WARP, another VPN client), or /dev/net/tun is not permitted. "+
+			"Set FREE_PROXY_TUNNEL_INTERFACE (active tunnel) or FREE_PROXY_PROBE_DEVICE_PREFIX (probes) to an unused name.", device)
 	}
-	if msg, ok := messages[FailureCode(lines)]; ok {
+	if msg, ok := failureMessages[code]; ok {
 		return msg
 	}
-	return messages[domain.FailUnknown]
+	return failureMessages[domain.FailUnknown]
 }
 
 // IsTerminalFailure reports whether a single line indicates an unrecoverable

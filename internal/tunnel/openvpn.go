@@ -147,9 +147,16 @@ func (m *Manager) ClearExitedProcess() {
 }
 
 // CleanupStaleProcesses terminates leftover openvpn processes started by this
-// project (identified by config/auth paths in their cmdline). Linux only.
+// project. Linux only.
+//
+// Identification is by exact argument match, never by substring: this function
+// signals processes, so "probably ours" is not good enough. The previous
+// version flattened the NUL-separated cmdline into a single string and asked
+// whether our data directory appeared anywhere in it, which would also match a
+// stranger's openvpn whose command line merely contained that path as a
+// substring (a sibling directory such as /var/lib/free-proxy-backup, or any
+// unrelated process when DATA_DIR is set somewhere generic).
 func (m *Manager) CleanupStaleProcesses() []int {
-	markers := []string{m.cfg.DataDir, m.authFile}
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil
@@ -165,18 +172,7 @@ func (m *Manager) CleanupStaleProcesses() []int {
 		if err != nil {
 			continue
 		}
-		cmdline := strings.ReplaceAll(string(raw), "\x00", " ")
-		if !strings.Contains(strings.ToLower(cmdline), "openvpn") {
-			continue
-		}
-		matched := false
-		for _, mk := range markers {
-			if strings.Contains(cmdline, mk) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
+		if !m.ownsCommandLine(splitCmdline(raw)) {
 			continue
 		}
 		if p, err := os.FindProcess(pid); err == nil {
@@ -189,6 +185,34 @@ func (m *Manager) CleanupStaleProcesses() []int {
 		time.Sleep(500 * time.Millisecond)
 	}
 	return terminated
+}
+
+// splitCmdline turns /proc/<pid>/cmdline into its real argument vector. The NUL
+// separators are what make exact matching possible, so they must not be
+// flattened away before inspection.
+func splitCmdline(raw []byte) []string {
+	trimmed := strings.TrimRight(string(raw), "\x00")
+	if trimmed == "" {
+		return nil
+	}
+	return strings.Split(trimmed, "\x00")
+}
+
+// ownsCommandLine reports whether an argument vector belongs to a tunnel this
+// project started. Two independent proofs, both exact: the auth file we write
+// (a path no other program has a reason to name), or a --config argument that
+// lives directly in our configs directory.
+func (m *Manager) ownsCommandLine(args []string) bool {
+	configsDir := m.cfg.ConfigsDir()
+	for i, arg := range args {
+		if arg == m.authFile {
+			return true
+		}
+		if arg == "--config" && i+1 < len(args) && filepath.Dir(args[i+1]) == configsDir {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) ensureAuthFile() error {

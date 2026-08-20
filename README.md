@@ -202,17 +202,39 @@ FREE_PROXY_DATA_DIR=/var/lib/free-proxy
 FREE_PROXY_DATABASE_URL=
 FREE_PROXY_SQL_ECHO=false
 FREE_PROXY_ALLOW_PROCESS_RESTART=true
-FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
 FREE_PROXY_OPENVPN_USERNAME=vpn
 FREE_PROXY_OPENVPN_PASSWORD=vpn
-FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_TEST_TUN_START=2
-FREE_PROXY_TEST_TUN_END=99
-FREE_PROXY_POLICY_ROUTING_TABLE=100
+FREE_PROXY_TUNNEL_INTERFACE=fpx0
+FREE_PROXY_PROBE_DEVICE_PREFIX=fpx
+FREE_PROXY_TEST_TUN_START=1
+FREE_PROXY_TEST_TUN_END=64
+FREE_PROXY_POLICY_ROUTING_TABLE=9527
 ```
 
 > 网页默认端口 `39527`,代理默认端口 `9527`,监听固定绑定 `0.0.0.0`;端口、凭据和外网访问均在后台配置。外网访问开关即时生效,其余运行参数保存后服务自动重启。
+
+### 与 3x-ui 等其它面板共存
+
+网卡名和策略路由表号属于**全系统共享的命名空间**。早期版本使用 `tun0` 和路由表 `100`——几乎每个隧道类程序(3x-ui 的 sing-box / Xray TUN 入站、WARP、tun2socks、其它 OpenVPN 实例)都默认占用这两个名字,于是在装了 3x-ui 的机器上会报 `TUN device is unavailable or not permitted`([#2](https://github.com/MasterAlanLab/free-proxy/issues/2))。
+
+现在本项目只使用自己的私有命名空间:
+
+| 资源 | 取值 | 说明 |
+| --- | --- | --- |
+| 活动隧道网卡 | `fpx0` | 离开公共的 `tunN` 池 |
+| 探测网卡池 | `fpx1`–`fpx64` | 分配前会向内核确认该名字未被占用 |
+| 策略路由表 | `9527` | 同时写入 `/etc/iproute2/rt_tables.d/free-proxy.conf`,方便其它工具看到该表已被占用 |
+
+三条配套保证:
+
+- **分配前校验**——探测网卡名在下发给 OpenVPN 之前会先检查内核中是否已存在同名接口,不会再抢别人的名字。
+- **按归属清理**——断开和退出时只删除指向 `fpx*` 网卡的规则与路由,绝不执行 `ip rule del table N` / `ip route flush table N` 这类会连带清空邻居配置的操作。即使路由表号与其它程序重合,对方的条目也不会被动到。
+- **提前诊断**——`free-proxy doctor` 和后台「系统诊断」会检查网卡名冲突与路由表占用,并直接给出该改哪个环境变量。
+
+从旧版本升级时,`free-proxy install` 会自动把仍是旧默认值(`tun0` / `100`)的配置迁移到新命名空间;你手动改过的值会原样保留。若仍需避让,改 `FREE_PROXY_TUNNEL_INTERFACE`、`FREE_PROXY_PROBE_DEVICE_PREFIX` 或 `FREE_PROXY_POLICY_ROUTING_TABLE` 后重启服务即可。
+
+> 网页端口 `39527` 与代理端口 `9527` 同样是共享资源。它们不与 3x-ui 的默认端口冲突,如遇占用可在后台修改。
 
 弱配置小鸡(如 1 核 / 1G)可在后台调低「探测并发数」「每次发现节点上限」「首次连接检测数」。
 

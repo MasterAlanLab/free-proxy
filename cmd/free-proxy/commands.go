@@ -13,6 +13,8 @@ import (
 	"syscall"
 
 	"github.com/masteralanlab/free-proxy/internal/config"
+	"github.com/masteralanlab/free-proxy/internal/naming"
+	"github.com/masteralanlab/free-proxy/internal/netx"
 	"github.com/masteralanlab/free-proxy/internal/platform"
 	"github.com/masteralanlab/free-proxy/internal/providers/vpngate"
 	"github.com/masteralanlab/free-proxy/internal/security"
@@ -295,6 +297,15 @@ func doctorCmd() *cobra.Command {
 		Short: "Check (and optionally install) required system dependencies",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			checks := platform.RunChecks()
+			// Naming checks need the resolved config. A config that fails to
+			// load is reported by `serve` itself; doctor still prints the
+			// dependency checks rather than aborting on it.
+			if cfg, err := loadConfig(); err == nil {
+				checks = append(checks, platform.NamingChecks(cmd.Context(),
+					cfg.TunnelInterface, cfg.ProbeDevicePrefix, cfg.PolicyRoutingTable)...)
+			} else {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: configuration could not be loaded, skipping naming checks: %v\n", err)
+			}
 			out := cmd.OutOrStdout()
 			for _, c := range checks {
 				mark := "OK  "
@@ -361,6 +372,27 @@ func installCmd() *cobra.Command {
 			if err := platform.WriteDefaultEnv(); err != nil {
 				return fmt.Errorf("write environment: %w", err)
 			}
+			// Upgrades keep their existing env file, so an install that still
+			// claims the shared tun0 / table 100 has to be moved explicitly.
+			migrated, err := platform.MigrateLegacyNaming()
+			if err != nil {
+				return fmt.Errorf("migrate network naming: %w", err)
+			}
+			if len(migrated) > 0 {
+				fmt.Fprintln(out, "Moved shared network identifiers into this project's private namespace:")
+				for _, change := range migrated {
+					fmt.Fprintf(out, "  %s\n", change)
+				}
+			}
+			// A previous run killed before it could tear down leaves policy
+			// entries pointing at the old device. They are inert now, but would
+			// hijack whatever creates that device name next.
+			if orphans := netx.CleanupOrphanedRules(ctx, nil, naming.LegacyTunnelInterface); len(orphans) > 0 {
+				fmt.Fprintf(out, "Removed stale policy entries left by an earlier release (device %s is gone):\n", naming.LegacyTunnelInterface)
+				for _, entry := range orphans {
+					fmt.Fprintf(out, "  %s\n", entry)
+				}
+			}
 			// The first install creates database-backed random admin credentials.
 			// Updates preserve them unless rotation was explicitly requested.
 			cfg, err := loadConfig()
@@ -369,6 +401,10 @@ func installCmd() *cobra.Command {
 			}
 			if err := cfg.EnsureDirectories(); err != nil {
 				return err
+			}
+			// Advisory: makes our table id visible as taken to other tools.
+			if err := platform.RegisterRoutingTable(cfg.PolicyRoutingTable); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not register routing table alias: %v\n", err)
 			}
 			db, repos, err := openAppStore(ctx, cfg)
 			if err != nil {

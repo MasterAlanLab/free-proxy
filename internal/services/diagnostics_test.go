@@ -42,3 +42,31 @@ func TestProviderHost(t *testing.T) {
 		}
 	}
 }
+
+// The rp_filter check must read the effective value, max(conf.all, conf.<dev>),
+// not conf.all alone. Once the router stopped forcing conf.all=2 (so it would
+// stop weakening every other interface on the host), an all-alone check turned
+// every conf.all=1 host — the default on RHEL-family distributions — into a
+// permanent, unclearable FAIL despite the tunnel working correctly.
+func TestRPFilterUsesEffectiveValue(t *testing.T) {
+	cases := []struct {
+		name     string
+		all, dev int
+		want     bool
+	}{
+		{"strict host, our device loose", 1, 2, true}, // the regression
+		{"disabled host, our device loose", 0, 2, true},
+		{"loose host, our device loose", 2, 2, true},
+		{"both disabled", 0, 0, true},
+		{"strict everywhere", 1, 1, false},
+		{"strict host, device untouched", 1, 0, false},
+		{"device strict, host disabled", 0, 1, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := rpFilterOK(c.all, c.dev); got != c.want {
+				t.Errorf("rpFilterOK(all=%d, dev=%d) = %v, want %v", c.all, c.dev, got, c.want)
+			}
+		})
+	}
+}

@@ -9,12 +9,14 @@ import (
 	"os/exec"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/masteralanlab/free-proxy/internal/config"
 	"github.com/masteralanlab/free-proxy/internal/domain"
+	"github.com/masteralanlab/free-proxy/internal/naming"
 	"github.com/masteralanlab/free-proxy/internal/netx"
 )
 
@@ -55,12 +57,13 @@ func (d *DiagnosticsService) Diagnose(ctx context.Context, forStartup bool) doma
 		commandCheck("sysctl", "sysctl"),
 		{Name: "tun_device", OK: fileExists("/dev/net/tun"), Detail: "/dev/net/tun"},
 		d.tunAccessCheck(),
+		d.tunNameCheck(),
+		d.routingTableCheck(ctx),
 		d.defaultRouteCheck(ctx),
 		d.sysctlCheck(ctx, "ipv4_forwarding", "net.ipv4.ip_forward", "1"),
 		d.sysctlCheck(ctx, "rp_filter", "net.ipv4.conf.all.rp_filter", "0", "2"),
 		d.dnsCheck(providerHost(d.cfg.VPNGateAPIURL)),
 		d.portCheck(forStartup),
-		{Name: "proxy_bindings", OK: d.localBinding(), Detail: fmt.Sprintf("http+socks5=%s:%d", d.cfg.ProxyHost, d.cfg.ProxyPort)},
 	}
 	d.mu.Lock()
 	checks = append(checks, d.lastProviderCheck...)
@@ -139,6 +142,39 @@ func (d *DiagnosticsService) tunAccessCheck() domain.DiagnosticCheck {
 	return domain.DiagnosticCheck{Name: "tun_access", OK: canWrite("/dev/net/tun"), Detail: "read/write access"}
 }
 
+// tunNameCheck reports whether the configured tunnel device name is claimed by
+// a program outside this project — the collision behind issue #2. A device that
+// is inside our own prefix pool is our tunnel or a leftover we reclaim, not a
+// conflict, so it must not be flagged.
+func (d *DiagnosticsService) tunNameCheck() domain.DiagnosticCheck {
+	if !linux() {
+		return domain.DiagnosticCheck{Name: "tun_name", OK: true, Detail: "not applicable outside Linux", Severity: "warning"}
+	}
+	device, prefix := d.cfg.TunnelInterface, d.cfg.ProbeDevicePrefix
+	if naming.HasDevicePrefix(device, prefix) || !netx.DeviceExists(device) {
+		return domain.DiagnosticCheck{Name: "tun_name", OK: true, Detail: device}
+	}
+	return domain.DiagnosticCheck{Name: "tun_name", OK: false, Recoverable: true, Detail: fmt.Sprintf(
+		"%s is already owned by another program; set FREE_PROXY_TUNNEL_INTERFACE to an unused name", device)}
+}
+
+// routingTableCheck reports whether another program shares our policy routing
+// table id. Not fatal (teardown is attribution-based) but worth surfacing.
+func (d *DiagnosticsService) routingTableCheck(ctx context.Context) domain.DiagnosticCheck {
+	if !linux() {
+		return domain.DiagnosticCheck{Name: "routing_table", OK: true, Detail: "not applicable outside Linux", Severity: "warning"}
+	}
+	router := netx.NewPolicyRouter(d.runner, netx.PolicyRouterConfig{
+		Table: d.cfg.PolicyRoutingTable, Interface: d.cfg.TunnelInterface, DevicePrefix: d.cfg.ProbeDevicePrefix,
+	})
+	if foreign := router.TableConflict(ctx); foreign > 0 {
+		return domain.DiagnosticCheck{Name: "routing_table", OK: false, Recoverable: true, Detail: fmt.Sprintf(
+			"table %d holds %d route(s) from another program; set FREE_PROXY_POLICY_ROUTING_TABLE to a free id",
+			d.cfg.PolicyRoutingTable, foreign)}
+	}
+	return domain.DiagnosticCheck{Name: "routing_table", OK: true, Detail: fmt.Sprintf("table %d", d.cfg.PolicyRoutingTable)}
+}
+
 func (d *DiagnosticsService) defaultRouteCheck(ctx context.Context) domain.DiagnosticCheck {
 	res, err := d.runner.Run(ctx, []string{"ip", "route", "show", "default"}, 5*time.Second)
 	iface := ParseDefaultInterface(res.Stdout)
@@ -174,6 +210,57 @@ func (d *DiagnosticsService) sysctlCheck(ctx context.Context, name, key string, 
 	return domain.DiagnosticCheck{Name: name, OK: ok, Detail: detail, Recoverable: true}
 }
 
+// rpFilterCheck reports whether reverse-path filtering would drop the tunnel's
+// return traffic.
+//
+// It reads the *effective* value, which the kernel defines as
+// max(conf.all, conf.<iface>) — not conf.all alone. Checking conf.all was
+// correct only while we forced it to 2; now that we scope our change to our own
+// device (so we stop weakening every other interface on the host), a host
+// shipping conf.all=1 would fail this check forever despite working perfectly.
+func (d *DiagnosticsService) rpFilterCheck(ctx context.Context) domain.DiagnosticCheck {
+	const name = "rp_filter"
+	if !linux() {
+		return domain.DiagnosticCheck{Name: name, OK: true, Detail: "not applicable outside Linux", Severity: "warning"}
+	}
+	device := d.cfg.TunnelInterface
+	if !netx.DeviceExists(device) {
+		// Nothing to judge: we configure the device when a tunnel connects.
+		return domain.DiagnosticCheck{Name: name, OK: true, Severity: "warning",
+			Detail: device + " is not up; configured when a tunnel connects"}
+	}
+	all, allOK := d.readSysctlInt(ctx, "net.ipv4.conf.all.rp_filter")
+	dev, devOK := d.readSysctlInt(ctx, "net.ipv4.conf."+device+".rp_filter")
+	if !allOK || !devOK {
+		return domain.DiagnosticCheck{Name: name, OK: false, Recoverable: true, Detail: "could not read rp_filter"}
+	}
+	detail := fmt.Sprintf("%s effective=%d (all=%d, %s=%d)", device, max(all, dev), all, device, dev)
+	if !rpFilterOK(all, dev) {
+		return domain.DiagnosticCheck{Name: name, OK: false, Recoverable: true,
+			Detail: detail + "; strict mode drops tunnel return traffic"}
+	}
+	return domain.DiagnosticCheck{Name: name, OK: true, Detail: detail}
+}
+
+// rpFilterOK reports whether the effective reverse-path mode lets tunnel return
+// traffic through. The kernel applies max(conf.all, conf.<iface>); 0 (disabled)
+// and 2 (loose) both pass, and only 1 (strict) drops our traffic, because the
+// reverse lookup consults the main table where no route points back out of the
+// tunnel.
+func rpFilterOK(all, dev int) bool { return max(all, dev) != 1 }
+
+func (d *DiagnosticsService) readSysctlInt(ctx context.Context, key string) (int, bool) {
+	res, err := d.runner.Run(ctx, []string{"sysctl", "-n", key}, 5*time.Second)
+	if err != nil || res.ReturnCode != 0 {
+		return 0, false
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
+	if err != nil {
+		return 0, false
+	}
+	return value, true
+}
+
 func (d *DiagnosticsService) portCheck(requireAvailable bool) domain.DiagnosticCheck {
 	addr := net.JoinHostPort(d.cfg.ProxyHost, fmt.Sprintf("%d", d.cfg.ProxyPort))
 	ln, err := net.Listen("tcp", addr)
@@ -201,15 +288,6 @@ func (d *DiagnosticsService) dnsCheck(host string) domain.DiagnosticCheck {
 	}
 	sort.Strings(addrs)
 	return domain.DiagnosticCheck{Name: "provider_dns", OK: len(addrs) > 0, Detail: strings.Join(addrs, ", ")}
-}
-
-func (d *DiagnosticsService) localBinding() bool {
-	switch d.cfg.ProxyHost {
-	case "127.0.0.1", "::1", "localhost":
-		return true
-	default:
-		return false
-	}
 }
 
 // DiagnoseProviderFailure records provider-connectivity checks after a failure.

@@ -142,7 +142,7 @@ func (Runner) Start(ctx context.Context, p StartParams) (domain.TunnelStartResul
 	return domain.TunnelStartResult{
 		Success:        false,
 		Status:         domain.TunnelFailed,
-		Message:        FailureMessage(lines),
+		Message:        FailureMessageFor(lines, p.Device),
 		FailureCode:    ptr(FailureCode(lines)),
 		StartupTimeMS:  int(time.Since(started).Milliseconds()),
 		LogTail:        lines,
@@ -213,24 +213,45 @@ func (m *Managed) SetExitHandler(h func(code int)) {
 	m.mu.Unlock()
 }
 
-// Stop terminates the process group and removes the config file.
+// Stop terminates the process group and removes the config file. Safe to call
+// on a process that already exited.
 func (m *Managed) Stop() {
 	m.mu.Lock()
 	m.intentional = true
 	m.mu.Unlock()
-	if m.cmd.Process != nil {
+	// Once watch() has reaped the child, the kernel is free to hand its pid to
+	// somebody else — and we kill by *process group*, so a stale pgid would
+	// signal a stranger's whole group. An exited process needs no signal
+	// anyway. This path is reached routinely: Disconnect and Connect both call
+	// Stop on a tunnel that may have died on its own moments earlier.
+	if m.cmd.Process != nil && !m.exited() {
 		pgid := m.cmd.Process.Pid
 		_ = syscall.Kill(-pgid, syscall.SIGTERM)
 		select {
 		case <-m.done:
 		case <-time.After(8 * time.Second):
-			_ = syscall.Kill(-pgid, syscall.SIGKILL)
+			// Re-check: the process may have exited during the grace period,
+			// making the pgid reusable before we escalate.
+			if !m.exited() {
+				_ = syscall.Kill(-pgid, syscall.SIGKILL)
+			}
 			<-m.done
 		}
 	}
 	_ = m.pr.Close()
 	if m.configPath != "" {
 		_ = os.Remove(m.configPath)
+	}
+}
+
+// exited reports whether watch() has already reaped the child, after which its
+// pid must not be signalled.
+func (m *Managed) exited() bool {
+	select {
+	case <-m.done:
+		return true
+	default:
+		return false
 	}
 }
 

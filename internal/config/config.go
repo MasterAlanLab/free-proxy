@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
+
+	"github.com/masteralanlab/free-proxy/internal/naming"
 )
 
 // Config holds all runtime settings. Field env tags omit the FREE_PROXY_
@@ -47,16 +50,23 @@ type Config struct {
 	DNSRepairServers        string  `env:"DNS_REPAIR_SERVERS" envDefault:"1.1.1.1,8.8.8.8"`
 
 	// Machine-level OpenVPN/TUN values intentionally remain environment-backed.
+	//
+	// TunnelInterface, ProbeDevicePrefix and PolicyRoutingTable all name things
+	// in namespaces shared with every other program on the host. Their defaults
+	// come from internal/naming rather than literals here, so the project has
+	// exactly one place that decides what it claims. Leave them unset to accept
+	// those defaults; set them to move out of a neighbour's way.
 	OpenVPNCommand            string  `env:"OPENVPN_COMMAND" envDefault:"openvpn"`
 	OpenVPNUsername           string  `env:"OPENVPN_USERNAME" envDefault:"vpn"`
 	OpenVPNPassword           string  `env:"OPENVPN_PASSWORD" envDefault:"vpn"`
 	OpenVPNTestTimeoutSecs    float64 `env:"OPENVPN_TEST_TIMEOUT_SECONDS" envDefault:"15"`
 	OpenVPNConnectTimeoutSecs float64 `env:"OPENVPN_CONNECT_TIMEOUT_SECONDS" envDefault:"35"`
-	TunnelInterface           string  `env:"TUNNEL_INTERFACE" envDefault:"tun0"`
-	TestTunStart              int     `env:"TEST_TUN_START" envDefault:"2"`
-	TestTunEnd                int     `env:"TEST_TUN_END" envDefault:"99"`
+	TunnelInterface           string  `env:"TUNNEL_INTERFACE"`
+	ProbeDevicePrefix         string  `env:"PROBE_DEVICE_PREFIX"`
+	TestTunStart              int     `env:"TEST_TUN_START" envDefault:"1"`
+	TestTunEnd                int     `env:"TEST_TUN_END" envDefault:"64"`
 	MaxProbeConcurrency       int     `env:"MAX_PROBE_CONCURRENCY" envDefault:"5"`
-	PolicyRoutingTable        int     `env:"POLICY_ROUTING_TABLE" envDefault:"100"`
+	PolicyRoutingTable        int     `env:"POLICY_ROUTING_TABLE"`
 
 	// Discovery fields are legacy import inputs; SQLite overwrites them at run time.
 	VPNGateAPIURL      string  `env:"VPNGATE_API_URL" envDefault:"https://www.vpngate.net/api/iphone/"`
@@ -78,9 +88,6 @@ type Config struct {
 	RoutingRetryIntervalSecs float64 `env:"ROUTING_RETRY_INTERVAL_SECONDS" envDefault:"1"`
 	RoutingStrictRPFilter    bool    `env:"ROUTING_STRICT_RP_FILTER" envDefault:"false"`
 	StaleNodeGraceSeconds    int     `env:"STALE_NODE_GRACE_SECONDS" envDefault:"604800"`
-
-	// PreflightStrict makes `serve` abort when a critical dependency is missing.
-	PreflightStrict bool `env:"PREFLIGHT_STRICT" envDefault:"false"`
 }
 
 // Load parses the environment into a Config, applies derived defaults, and
@@ -130,8 +137,8 @@ func loadEnvFile() {
 }
 
 func (c *Config) finalize() error {
-	if c.TestTunStart > c.TestTunEnd {
-		return errors.New("FREE_PROXY_TEST_TUN_START must not exceed FREE_PROXY_TEST_TUN_END")
+	if err := c.finalizeNaming(); err != nil {
+		return err
 	}
 	if (c.ProxyUsername == "") != (c.ProxyPassword == "") {
 		return errors.New("FREE_PROXY_PROXY_USERNAME and FREE_PROXY_PROXY_PASSWORD must be configured together")
@@ -146,6 +153,62 @@ func (c *Config) finalize() error {
 		c.DatabaseURL = fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(on)", dbPath)
 	}
 	return nil
+}
+
+// finalizeNaming resolves and validates every identifier this process places
+// into a host-global namespace. Anything left empty/zero takes the project
+// default from internal/naming; anything set by the operator is validated here
+// so a bad value fails at startup instead of inside an OpenVPN log line.
+func (c *Config) finalizeNaming() error {
+	if c.ProbeDevicePrefix == "" {
+		c.ProbeDevicePrefix = naming.DevicePrefix
+	}
+	if err := naming.ValidateDevicePrefix(c.ProbeDevicePrefix); err != nil {
+		return fmt.Errorf("FREE_PROXY_PROBE_DEVICE_PREFIX: %w", err)
+	}
+	if c.TunnelInterface == "" {
+		c.TunnelInterface = naming.ActiveDevice()
+	}
+	if err := naming.ValidateDeviceName(c.TunnelInterface); err != nil {
+		return fmt.Errorf("FREE_PROXY_TUNNEL_INTERFACE: %w", err)
+	}
+	if c.PolicyRoutingTable == 0 {
+		c.PolicyRoutingTable = naming.DefaultRoutingTable
+	}
+	if err := naming.ValidateRoutingTable(c.PolicyRoutingTable); err != nil {
+		return fmt.Errorf("FREE_PROXY_POLICY_ROUTING_TABLE: %w", err)
+	}
+	if c.TestTunStart < 0 {
+		return errors.New("FREE_PROXY_TEST_TUN_START must not be negative")
+	}
+	if c.TestTunStart > c.TestTunEnd {
+		return errors.New("FREE_PROXY_TEST_TUN_START must not exceed FREE_PROXY_TEST_TUN_END")
+	}
+	// The active tunnel's device must never fall inside the probe pool, or a
+	// probe would be handed the name the live exit is already using.
+	if idx, ok := probeIndex(c.TunnelInterface, c.ProbeDevicePrefix); ok && idx >= c.TestTunStart && idx <= c.TestTunEnd {
+		if idx != c.TestTunStart {
+			return fmt.Errorf("FREE_PROXY_TUNNEL_INTERFACE %q falls inside the probe device range %d-%d; move it out or narrow the range",
+				c.TunnelInterface, c.TestTunStart, c.TestTunEnd)
+		}
+		c.TestTunStart = idx + 1
+		if c.TestTunStart > c.TestTunEnd {
+			return fmt.Errorf("FREE_PROXY_TEST_TUN_END must leave at least one probe device above %q", c.TunnelInterface)
+		}
+	}
+	return nil
+}
+
+// probeIndex reports the pool index of device when it belongs to prefix.
+func probeIndex(device, prefix string) (int, bool) {
+	if !naming.HasDevicePrefix(device, prefix) {
+		return 0, false
+	}
+	idx, err := strconv.Atoi(device[len(prefix):])
+	if err != nil {
+		return 0, false
+	}
+	return idx, true
 }
 
 // EnsureDirectories creates the data directory tree used at runtime.

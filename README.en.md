@@ -210,17 +210,39 @@ FREE_PROXY_DATA_DIR=/var/lib/free-proxy
 FREE_PROXY_DATABASE_URL=
 FREE_PROXY_SQL_ECHO=false
 FREE_PROXY_ALLOW_PROCESS_RESTART=true
-FREE_PROXY_PREFLIGHT_STRICT=false
 FREE_PROXY_OPENVPN_COMMAND=openvpn
 FREE_PROXY_OPENVPN_USERNAME=vpn
 FREE_PROXY_OPENVPN_PASSWORD=vpn
-FREE_PROXY_TUNNEL_INTERFACE=tun0
-FREE_PROXY_TEST_TUN_START=2
-FREE_PROXY_TEST_TUN_END=99
-FREE_PROXY_POLICY_ROUTING_TABLE=100
+FREE_PROXY_TUNNEL_INTERFACE=fpx0
+FREE_PROXY_PROBE_DEVICE_PREFIX=fpx
+FREE_PROXY_TEST_TUN_START=1
+FREE_PROXY_TEST_TUN_END=64
+FREE_PROXY_POLICY_ROUTING_TABLE=9527
 ```
 
 > Web port, proxy port, credentials, discovery, maintenance, DNS, routing, and external-access options are managed in the dashboard and stored in SQLite.
+
+### Coexisting with 3x-ui and other panels
+
+Interface names and policy routing table ids are **host-global namespaces**. Earlier releases claimed `tun0` and table `100` — the defaults that nearly every other tunnel program also picks (3x-ui's sing-box/Xray TUN inbound, WARP, tun2socks, another OpenVPN instance) — so on a machine already running 3x-ui the service failed with `TUN device is unavailable or not permitted` ([#2](https://github.com/MasterAlanLab/free-proxy/issues/2)).
+
+The project now allocates only from its own namespace:
+
+| Resource | Value | Notes |
+| --- | --- | --- |
+| Active tunnel device | `fpx0` | Outside the shared `tunN` pool |
+| Probe device pool | `fpx1`–`fpx64` | Each name is verified free against the kernel before use |
+| Policy routing table | `9527` | Also registered in `/etc/iproute2/rt_tables.d/free-proxy.conf` so other tools can see the id is taken |
+
+Three guarantees back that up:
+
+- **Verified before use** — a probe device name is checked against the host's existing interfaces before it is handed to OpenVPN, so we never race another program for a name.
+- **Attribution-based teardown** — disconnect and shutdown remove only rules and routes pointing at an `fpx*` device. The blanket `ip rule del table N` / `ip route flush table N` is gone, so even when the table id is shared, a neighbour's entries are left untouched.
+- **Diagnosed early** — `free-proxy doctor` and the dashboard's system diagnostics report device-name and routing-table conflicts, naming the setting that moves us out of the way.
+
+Upgrades are migrated automatically: `free-proxy install` rewrites configuration still holding the old defaults (`tun0` / `100`) and leaves any value you chose yourself alone. To move further, set `FREE_PROXY_TUNNEL_INTERFACE`, `FREE_PROXY_PROBE_DEVICE_PREFIX`, or `FREE_PROXY_POLICY_ROUTING_TABLE` and restart the service.
+
+> Web port `39527` and proxy port `9527` are shared resources too. They do not collide with 3x-ui's defaults; change them in the dashboard if something else holds them.
 
 On low-spec VPSes (e.g. 1 core / 1 GB) you can lower the probe load:
 

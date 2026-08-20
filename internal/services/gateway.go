@@ -25,6 +25,7 @@ type GatewayService struct {
 	proxy        *proxy.Gateway
 	pool         *ProxyPoolService
 	coordinator  *Coordinator
+	runner       netx.CommandRunner
 
 	opMu              sync.Mutex
 	mu                sync.Mutex
@@ -38,10 +39,14 @@ type GatewayService struct {
 
 // NewGatewayService constructs a GatewayService.
 func NewGatewayService(cfg *config.Config, nodes *store.NodeRepository, settingsRepo *store.SettingsRepository,
-	mgr *tunnel.Manager, router *netx.PolicyRouter, pg *proxy.Gateway, pool *ProxyPoolService, coordinator *Coordinator) *GatewayService {
+	mgr *tunnel.Manager, router *netx.PolicyRouter, pg *proxy.Gateway, pool *ProxyPoolService,
+	coordinator *Coordinator, runner netx.CommandRunner) *GatewayService {
+	if runner == nil {
+		runner = netx.SystemCommandRunner{}
+	}
 	return &GatewayService{
 		cfg: cfg, nodes: nodes, settingsRepo: settingsRepo, tunnel: mgr, router: router,
-		proxy: pg, pool: pool, coordinator: coordinator, connectionEnabled: true,
+		proxy: pg, pool: pool, coordinator: coordinator, runner: runner, connectionEnabled: true,
 	}
 }
 
@@ -49,6 +54,17 @@ func NewGatewayService(cfg *config.Config, nodes *store.NodeRepository, settings
 func (g *GatewayService) Start(ctx context.Context) error {
 	g.tunnel.CleanupStaleProcesses()
 	_ = g.router.Cleanup(ctx)
+	// Devices left behind by a crashed run would otherwise make the allocator
+	// (which now refuses names already present on the host) skip them forever.
+	if removed := netx.ReclaimStaleDevices(ctx, g.runner, g.cfg.ProbeDevicePrefix); len(removed) > 0 {
+		slog.Info("reclaimed leftover tunnel devices", "module", "gateway", "devices", removed)
+	}
+	// A shared routing table is not fatal — cleanup is attribution-based — but
+	// the operator should know the id collides with another program.
+	if foreign := g.router.TableConflict(ctx); foreign > 0 {
+		slog.Warn("policy routing table is shared with another program; set FREE_PROXY_POLICY_ROUTING_TABLE to a free id",
+			"module", "gateway", "table", g.router.Table(), "foreign_routes", foreign)
+	}
 	if g.cfg.ProxyEnabled {
 		return g.proxy.Start(ctx)
 	}
@@ -81,6 +97,15 @@ func (g *GatewayService) activate(ctx context.Context, nodeID string) (domain.Tu
 	_ = g.settingsRepo.SetConnectionEnabled(ctx, true)
 	g.setConnectionEnabled(true)
 	if err := g.pool.ValidateAllowed(ctx, node); err != nil {
+		return domain.TunnelStartResult{}, err
+	}
+
+	// Verify the active device name is actually free before OpenVPN gets it —
+	// the same guarantee the probe allocator gives, which the active tunnel
+	// previously went without.
+	if err := netx.EnsureDeviceAvailable(ctx, g.runner, g.cfg.ProbeDevicePrefix, g.cfg.TunnelInterface); err != nil {
+		g.setLastError(err.Error())
+		slog.Warn("tunnel device unavailable", "module", "gateway", "device", g.cfg.TunnelInterface, "err", err)
 		return domain.TunnelStartResult{}, err
 	}
 
