@@ -4,23 +4,23 @@ import "time"
 
 // DiscoveredNode is a raw candidate parsed from a provider before probing.
 type DiscoveredNode struct {
-	ID              string            `json:"id"`
-	Provider        string            `json:"provider"`
-	ProviderNodeID  string            `json:"provider_node_id"`
-	ProviderIdentity string           `json:"provider_identity"`
-	Country         string            `json:"country"`
-	CountryCode     string            `json:"country_code"`
-	HostName        string            `json:"host_name"`
-	IPAddress       string            `json:"ip_address"`
-	RemoteHost      string            `json:"remote_host"`
-	RemotePort      int               `json:"remote_port"`
-	Transport       TransportProtocol `json:"transport"`
-	SourceScore     int               `json:"source_score"`
-	SourcePingMS    int               `json:"source_ping_ms"`
-	SourceSpeedBPS  int64             `json:"source_speed_bps"`
-	SourceSessions  int               `json:"source_sessions"`
-	ConfigText      string            `json:"config_text"`
-	FetchedAt       time.Time         `json:"fetched_at"`
+	ID               string            `json:"id"`
+	Provider         string            `json:"provider"`
+	ProviderNodeID   string            `json:"provider_node_id"`
+	ProviderIdentity string            `json:"provider_identity"`
+	Country          string            `json:"country"`
+	CountryCode      string            `json:"country_code"`
+	HostName         string            `json:"host_name"`
+	IPAddress        string            `json:"ip_address"`
+	RemoteHost       string            `json:"remote_host"`
+	RemotePort       int               `json:"remote_port"`
+	Transport        TransportProtocol `json:"transport"`
+	SourceScore      int               `json:"source_score"`
+	SourcePingMS     int               `json:"source_ping_ms"`
+	SourceSpeedBPS   int64             `json:"source_speed_bps"`
+	SourceSessions   int               `json:"source_sessions"`
+	ConfigText       string            `json:"config_text"`
+	FetchedAt        time.Time         `json:"fetched_at"`
 }
 
 // ProxyNodeRead is the API/DB view of a stored node.
@@ -93,14 +93,14 @@ type ProxyNodeTarget struct {
 }
 
 type DiscoveryResult struct {
-	Provider        string `json:"provider"`
-	Discovered      int    `json:"discovered"`
-	Stored          int    `json:"stored"`
-	TotalRows       *int   `json:"total_rows,omitempty"`
-	ValidRows       *int   `json:"valid_rows,omitempty"`
-	DuplicateRows   *int   `json:"duplicate_rows,omitempty"`
-	MalformedRows   *int   `json:"malformed_rows,omitempty"`
-	MissingFieldRows *int  `json:"missing_field_rows,omitempty"`
+	Provider         string `json:"provider"`
+	Discovered       int    `json:"discovered"`
+	Stored           int    `json:"stored"`
+	TotalRows        *int   `json:"total_rows,omitempty"`
+	ValidRows        *int   `json:"valid_rows,omitempty"`
+	DuplicateRows    *int   `json:"duplicate_rows,omitempty"`
+	MalformedRows    *int   `json:"malformed_rows,omitempty"`
+	MissingFieldRows *int   `json:"missing_field_rows,omitempty"`
 }
 
 type MaintenanceResult struct {
@@ -108,6 +108,14 @@ type MaintenanceResult struct {
 	Probed          int     `json:"probed"`
 	Available       int     `json:"available"`
 	ConnectedNodeID *string `json:"connected_node_id,omitempty"`
+}
+
+// LivenessResult reports one full-pool reachability sweep.
+type LivenessResult struct {
+	Checked int `json:"checked"`
+	Alive   int `json:"alive"`
+	Dead    int `json:"dead"`
+	Deleted int `json:"deleted"`
 }
 
 type JobRead struct {
@@ -122,13 +130,13 @@ type JobRead struct {
 }
 
 type TunnelStartResult struct {
-	Success       bool               `json:"success"`
-	Status        TunnelStatus       `json:"status"`
-	Message       string             `json:"message"`
-	StartupTimeMS int                `json:"startup_time_ms"`
-	FailureCode   *TunnelFailureCode `json:"failure_code"`
-	LogTail       []string           `json:"log_tail"`
-	HandshakeStage string            `json:"handshake_stage"`
+	Success        bool               `json:"success"`
+	Status         TunnelStatus       `json:"status"`
+	Message        string             `json:"message"`
+	StartupTimeMS  int                `json:"startup_time_ms"`
+	FailureCode    *TunnelFailureCode `json:"failure_code"`
+	LogTail        []string           `json:"log_tail"`
+	HandshakeStage string             `json:"handshake_stage"`
 }
 
 type ProbeResult struct {
@@ -153,18 +161,18 @@ type ProbeManyRequest struct {
 }
 
 type GatewayStatus struct {
-	Running          bool           `json:"running"`
-	ActiveNodeID     *string        `json:"active_node_id"`
-	TunnelStatus     TunnelStatus   `json:"tunnel_status"`
-	ProxyListener    string         `json:"proxy_listener"`
-	SocksListener    string         `json:"socks_listener"`
-	HTTPListener     string         `json:"http_listener"`
-	LastError        *string        `json:"last_error"`
-	ActiveLatencyMS  int            `json:"active_latency_ms"`
-	ExitIP           *string        `json:"exit_ip"`
-	ExitLatencyMS    int            `json:"exit_latency_ms"`
-	ConnectionEnabled bool          `json:"connection_enabled"`
-	MonitorStatus    map[string]any `json:"monitor_status"`
+	Running           bool           `json:"running"`
+	ActiveNodeID      *string        `json:"active_node_id"`
+	TunnelStatus      TunnelStatus   `json:"tunnel_status"`
+	ProxyListener     string         `json:"proxy_listener"`
+	SocksListener     string         `json:"socks_listener"`
+	HTTPListener      string         `json:"http_listener"`
+	LastError         *string        `json:"last_error"`
+	ActiveLatencyMS   int            `json:"active_latency_ms"`
+	ExitIP            *string        `json:"exit_ip"`
+	ExitLatencyMS     int            `json:"exit_latency_ms"`
+	ConnectionEnabled bool           `json:"connection_enabled"`
+	MonitorStatus     map[string]any `json:"monitor_status"`
 }
 
 type IpInfo struct {
@@ -178,20 +186,20 @@ type IpInfo struct {
 }
 
 type ProxySettings struct {
-	RoutingMode      ProxyPolicyMode `json:"routing_mode"`
-	ForceCountry     string          `json:"force_country"`
-	RoutingIPType    RoutingIpType   `json:"routing_ip_type"`
-	ConnectionEnabled bool           `json:"connection_enabled"`
-	FixedNodeID      *string         `json:"fixed_node_id"`
-	FavoriteNodeIDs  []string        `json:"favorite_node_ids"`
+	RoutingMode       ProxyPolicyMode `json:"routing_mode"`
+	ForceCountry      string          `json:"force_country"`
+	RoutingIPType     RoutingIpType   `json:"routing_ip_type"`
+	ConnectionEnabled bool            `json:"connection_enabled"`
+	FixedNodeID       *string         `json:"fixed_node_id"`
+	FavoriteNodeIDs   []string        `json:"favorite_node_ids"`
 }
 
 type ProxySettingsUpdate struct {
-	RoutingMode      ProxyPolicyMode `json:"routing_mode" validate:"required"`
-	ForceCountry     string          `json:"force_country"`
-	RoutingIPType    RoutingIpType   `json:"routing_ip_type"`
-	ConnectionEnabled bool           `json:"connection_enabled"`
-	FixedNodeID      *string         `json:"fixed_node_id"`
+	RoutingMode       ProxyPolicyMode `json:"routing_mode" validate:"required"`
+	ForceCountry      string          `json:"force_country"`
+	RoutingIPType     RoutingIpType   `json:"routing_ip_type"`
+	ConnectionEnabled bool            `json:"connection_enabled"`
+	FixedNodeID       *string         `json:"fixed_node_id"`
 }
 
 type ProxyHealthResult struct {

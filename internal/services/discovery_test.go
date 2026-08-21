@@ -101,16 +101,26 @@ func TestDiscoverySnapshotMarksAbsent(t *testing.T) {
 	if _, err := NewDiscoveryService(second, repos.Nodes).Discover(ctx); err != nil {
 		t.Fatalf("second: %v", err)
 	}
-	current, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{CurrentOnly: true})
+	listed, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{ListedOnly: true})
 	if err != nil {
-		t.Fatalf("count current: %v", err)
+		t.Fatalf("count listed: %v", err)
 	}
-	if current != 1 {
-		t.Fatalf("current nodes = %d, want 1 (us-1 marked absent)", current)
+	if listed != 1 {
+		t.Fatalf("listed nodes = %d, want 1 (us-1 marked absent)", listed)
+	}
+	// Dropping out of the provider listing must not remove the node: the
+	// provider rotates which servers it publishes, so absence is not evidence
+	// the node is gone. Only the liveness sweep deletes.
+	all, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{})
+	if err != nil {
+		t.Fatalf("count all: %v", err)
+	}
+	if all != 2 {
+		t.Fatalf("retained rows = %d, want 2", all)
 	}
 }
 
-func TestStatisticsAndSnapshotOnlyUseCurrentNodes(t *testing.T) {
+func TestStatisticsCountWholePool(t *testing.T) {
 	repos := newTestRepos(t)
 	ctx := context.Background()
 
@@ -123,8 +133,8 @@ func TestStatisticsAndSnapshotOnlyUseCurrentNodes(t *testing.T) {
 		t.Fatalf("classify nodes: %v", err)
 	}
 
-	// A rejected row is a row that is not usable in the latest snapshot. It must
-	// not cause every node from the previous snapshot to remain current.
+	// The second listing publishes only one of the two nodes. Both stay counted:
+	// statistics describe the retained pool, which is what the node list shows.
 	second := &fakeProvider{
 		nodes: []domain.DiscoveredNode{disc("jp-1", "1.1.1.1")},
 		stats: [5]int{2, 1, 0, 1, 0},
@@ -138,15 +148,15 @@ func TestStatisticsAndSnapshotOnlyUseCurrentNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("statistics: %v", err)
 	}
-	if stats.Total != 1 || stats.Ready != 1 || stats.Residential != 1 || stats.Countries != 1 {
-		t.Fatalf("current statistics = %+v, want one current ready residential node", stats)
+	if stats.Total != 2 || stats.Ready != 2 || stats.Residential != 2 || stats.Countries != 1 {
+		t.Fatalf("statistics = %+v, want both retained ready residential nodes", stats)
 	}
 	all, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{})
 	if err != nil {
-		t.Fatalf("count history: %v", err)
+		t.Fatalf("count pool: %v", err)
 	}
-	if all != 2 {
-		t.Fatalf("retained rows = %d, want 2", all)
+	if int64(stats.Total) != all {
+		t.Fatalf("statistics total = %d but list holds %d rows; they must agree", stats.Total, all)
 	}
 }
 
@@ -165,15 +175,15 @@ func TestFavoriteFilterIncludesRetainedHistory(t *testing.T) {
 		t.Fatalf("second: %v", err)
 	}
 
-	current, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{FavoriteOnly: true, CurrentOnly: true})
+	listed, err := repos.Nodes.CountNodes(ctx, store.NodeFilter{FavoriteOnly: true, ListedOnly: true})
 	if err != nil {
-		t.Fatalf("count current favorites: %v", err)
+		t.Fatalf("count listed favorites: %v", err)
 	}
 	all, err := repos.Nodes.ListNodes(ctx, store.NodeFilter{FavoriteOnly: true}, 20, 0)
 	if err != nil {
 		t.Fatalf("list all favorites: %v", err)
 	}
-	if current != 0 || len(all) != 1 || all[0].ID != "us-1" || all[0].SourcePresent {
-		t.Fatalf("favorites current=%d all=%+v, want retained historical us-1", current, all)
+	if listed != 0 || len(all) != 1 || all[0].ID != "us-1" || all[0].SourcePresent {
+		t.Fatalf("favorites listed=%d all=%+v, want retained unlisted us-1", listed, all)
 	}
 }

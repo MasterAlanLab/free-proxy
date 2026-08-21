@@ -35,6 +35,7 @@ func NewServer(deps *Deps) *echo.Echo {
 	g.GET("/proxies", h.ListProxies)
 	g.POST("/proxies/discover", h.DiscoverProxies)
 	g.POST("/proxies/refresh", h.RefreshProxies)
+	g.POST("/proxies/sweep", h.SweepProxies)
 	g.POST("/proxies/probe", h.ProbeMultiple)
 	g.POST("/proxies/:id/probe", h.ProbeOne)
 	g.GET("/proxies/:id/probes", h.ProbeHistory)

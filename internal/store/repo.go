@@ -166,7 +166,14 @@ type NodeFilter struct {
 	Country      string
 	Search       string
 	FavoriteOnly bool
-	CurrentOnly  bool
+	// ListedOnly narrows to nodes in the provider's newest published list. It is
+	// a diagnostic view, not a usability filter — see MarkProviderSnapshot.
+	ListedOnly bool
+	// ReachableOnly drops nodes the last liveness sweep could not reach. A host
+	// that refuses a TCP connection cannot complete an OpenVPN-over-TCP
+	// handshake either, so this is how the cheap check protects the expensive
+	// one from spending its whole budget on hosts already known to be gone.
+	ReachableOnly bool
 }
 
 func (f NodeFilter) where() (string, []any) {
@@ -193,8 +200,11 @@ func (f NodeFilter) where() (string, []any) {
 	if f.FavoriteOnly {
 		clauses = append(clauses, "EXISTS (SELECT 1 FROM favorites WHERE favorites.node_id = proxy_nodes.id)")
 	}
-	if f.CurrentOnly {
+	if f.ListedOnly {
 		clauses = append(clauses, "source_present = 1")
+	}
+	if f.ReachableOnly {
+		clauses = append(clauses, "liveness_failures = 0")
 	}
 	if len(clauses) == 0 {
 		return "", args
@@ -350,9 +360,9 @@ func (r *NodeRepository) Delete(ctx context.Context, id string) error {
 	return r.q.DeleteNode(ctx, id)
 }
 
-// Statistics returns counts for the current provider snapshot. Historical rows
-// are retained for a grace period, but the proxy list hides them by default, so
-// including them here would make every dashboard count disagree with the list.
+// Statistics counts the whole pool. Every retained row is a node the liveness
+// sweep has not disproved, so there is no longer a subset to exclude: what the
+// dashboard counts and what the list shows are the same rows.
 func (r *NodeRepository) Statistics(ctx context.Context) (domain.PoolStatistics, error) {
 	var s domain.PoolStatistics
 	row := r.db.QueryRowContext(ctx, `SELECT
@@ -366,8 +376,7 @@ func (r *NodeRepository) Statistics(ctx context.Context) (domain.PoolStatistics,
 		SUM(CASE WHEN ip_type='hosting' THEN 1 ELSE 0 END),
 		SUM(CASE WHEN ip_type='unknown' THEN 1 ELSE 0 END),
 		COUNT(DISTINCT CASE WHEN country != '' THEN country END)
-		FROM proxy_nodes
-		WHERE source_present = 1`)
+		FROM proxy_nodes`)
 	var ready, disc, unavail, cool, res, mob, host, unk, countries sql.NullInt64
 	var total int64
 	if err := row.Scan(&total, &ready, &disc, &unavail, &cool, &res, &mob, &host, &unk, &countries); err != nil {

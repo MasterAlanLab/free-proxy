@@ -8,6 +8,12 @@ import (
 	"github.com/masteralanlab/free-proxy/internal/store"
 )
 
+// candidateFetchLimit bounds how many rows the selection and probe paths pull in
+// one go. It sits far above the pool's steady-state size on purpose: the pool is
+// no longer capped at one provider snapshot, so a limit near the expected size
+// would silently truncate the candidate set instead of failing visibly.
+const candidateFetchLimit = 5000
+
 // ProxyPoolService selects and filters usable nodes per routing settings.
 type ProxyPoolService struct {
 	nodes    *store.NodeRepository
@@ -28,7 +34,7 @@ func (s *ProxyPoolService) SelectBest(ctx context.Context, excludeNodeID string)
 	if !settings.ConnectionEnabled {
 		return nil, nil
 	}
-	candidates, err := s.nodes.ListNodes(ctx, store.NodeFilter{Status: string(domain.NodeReady), CurrentOnly: true}, 1000, 0)
+	candidates, err := s.nodes.ListNodes(ctx, store.NodeFilter{Status: string(domain.NodeReady)}, candidateFetchLimit, 0)
 	if err != nil {
 		return nil, err
 	}

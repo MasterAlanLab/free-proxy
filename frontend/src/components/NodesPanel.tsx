@@ -18,7 +18,7 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
   const [search, setSearch] = useState("");
   const [ipType, setIpType] = useState("");
   const [status, setStatus] = useState("");
-  const [includeHistory, setIncludeHistory] = useState(false);
+  const [listedOnly, setListedOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState("");
@@ -31,7 +31,7 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
       const res = await api.listProxies({
         limit: PAGE, offset: page * PAGE, search, ip_type: ipType, status,
         favorite: favoriteOnly,
-        include_history: favoriteOnly || includeHistory,
+        listed_only: !favoriteOnly && listedOnly,
       });
       setItems(res.items);
       setTotal(res.total);
@@ -40,7 +40,7 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
     } finally {
       setLoading(false);
     }
-  }, [page, search, ipType, status, includeHistory, favoriteOnly, push]);
+  }, [page, search, ipType, status, listedOnly, favoriteOnly, push]);
 
   useEffect(() => {
     load();
@@ -95,7 +95,7 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
 
   return (
     <Card
-      title={`${favoriteOnly ? "收藏节点" : includeHistory ? "全部节点记录" : "当前节点池"}（${total}）`}
+      title={`${favoriteOnly ? "收藏节点" : listedOnly ? "来源最新名单" : "当前节点池"}（${total}）`}
       actions={
         <>
           {!favoriteOnly && <>
@@ -133,20 +133,20 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
           <option value="cooldown">冷却</option>
         </select>
         {!favoriteOnly && <label className="flex items-center gap-2 px-2 text-sm text-ink-2 whitespace-nowrap">
-          <input type="checkbox" checked={includeHistory}
-            onChange={(e) => { setPage(0); setIncludeHistory(e.target.checked); }} />
-          包含历史节点
+          <input type="checkbox" checked={listedOnly}
+            onChange={(e) => { setPage(0); setListedOnly(e.target.checked); }} />
+          仅来源最新名单
         </label>}
         <button className="btn" onClick={load} disabled={loading}>{loading ? <Spinner /> : "刷新"}</button>
       </div>
 
       <p className="text-xs text-ink-3 mb-3">
         {favoriteOnly ? <>
-          这里包含全部收藏记录；标记为“历史”的节点已不在最新来源快照中，可以先测试确认后再切换。
-          取消收藏后节点会从本页移除。
+          这里包含全部收藏记录；标记为“未在名单”的节点只是不在来源最近一次公布的名单里，多数仍然可用，
+          可以先测试确认后再切换。取消收藏后节点会从本页移除。
         </> : <>
-          默认只显示来源最近一次快照，每页 {PAGE} 条；总数受后台「每次发现节点上限」和来源实时节点数影响。
-          历史节点仅为宽限期内保留的旧记录。
+          默认显示节点池全部节点，每页 {PAGE} 条。VPN Gate 每次只公布约 100 台轮换节点，节点池会持续累积，
+          并由后台探活自动删除确认失效的节点，因此“未在名单”不代表不可用。
         </>}
         “切换节点”会立即使用该节点，并自动改为固定节点；“测试节点”只检查连接和延迟，不会切换当前节点。
       </p>
@@ -173,9 +173,9 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
               </td></tr>
             )}
             {items.map((n) => (
-              <tr key={n.id} className={`hover:bg-paper-2/50 ${n.source_present ? "" : "opacity-60"}`}>
+              <tr key={n.id} className="hover:bg-paper-2/50">
                 <td className="td">
-                  <input type="checkbox" disabled={!favoriteOnly && !n.source_present}
+                  <input type="checkbox"
                     checked={selected.has(n.id)} onChange={() => toggleSel(n.id)} />
                 </td>
                 <td className="td">
@@ -186,19 +186,22 @@ export function NodesPanel({ settings, onChanged, favoriteOnly = false }: {
                 </td>
                 <td className="td font-mono text-[0.8rem]">{n.ip_address}<div className="text-xs text-ink-3 font-sans">{n.transport}</div></td>
                 <td className="td"><Badge label={ipLabel(n.ip_type)} tone={n.ip_type} /></td>
-                <td className="td"><Badge label={n.source_present ? statusLabel(n.status) : "历史"}
-                  tone={n.source_present ? n.status : "unknown"} /></td>
+                <td className="td">
+                  <Badge label={statusLabel(n.status)} tone={n.status} />
+                  {!n.source_present && <div className="text-xs text-ink-3 mt-1"
+                    title="不在来源最近一次公布的名单里；来源每次只公布约 100 台轮换节点，这不代表节点不可用">未在名单</div>}
+                </td>
                 <td className="td tabular-nums">{n.latency_ms > 0 ? `${n.latency_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_ping_ms > 0 ? `${n.source_ping_ms} ms` : "—"}</td>
                 <td className="td tabular-nums text-ink-3">{formatSpeed(n.source_speed_bps)}</td>
                 <td className="td tabular-nums text-ink-3">{n.source_sessions}</td>
                 <td className="td text-right whitespace-nowrap">
-                  <button className="btn btn-sm btn-primary mr-1" disabled={!!busy || (!favoriteOnly && !n.source_present)}
+                  <button className="btn btn-sm btn-primary mr-1" disabled={!!busy}
                     onClick={() => runJob("切换节点", () => api.activate(n.id))}
                     title="切换到此节点，并锁定为固定节点">
                     切换节点
                   </button>
-                  <button className="btn btn-sm mr-1" disabled={!!busy || (!favoriteOnly && !n.source_present)}
+                  <button className="btn btn-sm mr-1" disabled={!!busy}
                     onClick={() => runJob("测试节点", () => api.probeOne(n.id))}
                     title="测试此节点是否能连接，并记录实际延迟">
                     测试节点

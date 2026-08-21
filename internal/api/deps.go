@@ -29,8 +29,10 @@ type Deps struct {
 	Diagnostics *services.DiagnosticsService
 	Maintenance *services.MaintenanceService
 	AutoSwitch  *services.AutoSwitchService
+	Liveness    *services.LivenessService
 
 	MaintenanceMon   *services.MaintenanceMonitor
 	ActiveLatencyMon *services.ActiveLatencyMonitor
 	HealthMon        *services.HealthMonitor
+	LivenessMon      *services.LivenessMonitor
 }

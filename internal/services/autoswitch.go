@@ -83,7 +83,7 @@ func (s *AutoSwitchService) HandleUnexpectedExit(ctx context.Context) {
 }
 
 func (s *AutoSwitchService) selectExcluding(ctx context.Context, excluded map[string]bool) (*domain.ProxyNodeRead, error) {
-	candidates, err := s.nodes.ListNodes(ctx, store.NodeFilter{Status: string(domain.NodeReady), CurrentOnly: true}, 1000, 0)
+	candidates, err := s.nodes.ListNodes(ctx, store.NodeFilter{Status: string(domain.NodeReady)}, 1000, 0)
 	if err != nil {
 		return nil, err
 	}

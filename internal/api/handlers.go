@@ -123,12 +123,15 @@ func (h *Handlers) cookiePath() string {
 func (h *Handlers) ListProxies(c *echo.Context) error {
 	limit := clampInt(queryInt(c, "limit", 100), 1, 500)
 	offset := maxInt(queryInt(c, "offset", 0), 0)
-	includeHistory := c.QueryParam("include_history") == "true"
+	// Every retained node is one the liveness sweep has not disproved, so the
+	// default list is the whole pool. listed_only narrows to the provider's
+	// newest published batch, which is a diagnostic view of the rotation rather
+	// than a filter for usable nodes.
 	filter := store.NodeFilter{
 		IPType: c.QueryParam("ip_type"), Status: c.QueryParam("status"),
 		Country: c.QueryParam("country"), Search: c.QueryParam("search"),
 		FavoriteOnly: c.QueryParam("favorite") == "true",
-		CurrentOnly:  !includeHistory,
+		ListedOnly:   c.QueryParam("listed_only") == "true",
 	}
 	ctx := c.Request().Context()
 	items, err := h.Deps.Repos.Nodes.ListNodes(ctx, filter, limit, offset)
@@ -144,6 +147,17 @@ func (h *Handlers) ListProxies(c *echo.Context) error {
 
 func (h *Handlers) DiscoverProxies(c *echo.Context) error {
 	job, err := h.Deps.Jobs.Submit(c.Request().Context(), "discover-proxies", h.Deps.Discovery.DiscoverJob)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusAccepted, job)
+}
+
+// SweepProxies runs the reachability sweep on demand. It takes no coordinator
+// lock: dialing nodes directly touches neither the tunnel nor the routing table,
+// so it is safe to run while maintenance is probing.
+func (h *Handlers) SweepProxies(c *echo.Context) error {
+	job, err := h.Deps.Jobs.Submit(c.Request().Context(), "sweep-proxies", h.Deps.Liveness.SweepJob)
 	if err != nil {
 		return err
 	}
@@ -460,6 +474,7 @@ func (h *Handlers) SystemStatus(c *echo.Context) error {
 		"maintenance":    monitorPayload(&h.Deps.MaintenanceMon.State),
 		"active_latency": monitorPayload(&h.Deps.ActiveLatencyMon.State),
 		"health":         monitorPayload(&h.Deps.HealthMon.State),
+		"liveness":       monitorPayload(&h.Deps.LivenessMon.State),
 	}
 	running := map[string]any{}
 	for k, v := range monitors {
