@@ -61,11 +61,21 @@ func (m *MaintenanceService) run(ctx context.Context) (domain.MaintenanceResult,
 	defer m.mu.Unlock()
 	slog.Info("starting periodic maintenance", "module", "maintenance")
 	_ = m.nodes.ClearExpiredBlacklist(ctx)
+	// A provider fetch that fails must not cost the cycle its probe pass: probing
+	// reads the stored pool and does not need the provider to answer. Aborting
+	// here used to drop a whole 200-node pass over a transient network error.
+	//
+	// The purge is the one step that does depend on the fetch. last_seen_at only
+	// advances on a successful discovery, so running it after a failure reads an
+	// outage as the entire pool going stale — and once the outage outlasts the
+	// grace window that deletes every node, all of them still working.
 	discovery, err := m.discovery.Discover(ctx)
 	if err != nil {
-		return domain.MaintenanceResult{}, err
+		slog.Warn("node discovery failed; probing the stored pool and skipping the stale purge",
+			"module", "maintenance", "err", err)
+	} else {
+		_, _ = m.nodes.PurgeStaleNodes(ctx, m.cfg.StaleNodeGrace())
 	}
-	_, _ = m.nodes.PurgeStaleNodes(ctx, m.cfg.StaleNodeGrace())
 
 	settings, err := m.settingsRepo.Get(ctx)
 	if err != nil {
