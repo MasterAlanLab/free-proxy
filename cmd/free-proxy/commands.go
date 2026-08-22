@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -97,7 +99,11 @@ func credentialsCmd() *cobra.Command {
 			}
 			c := adminStore.Config()
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "URL: http://%s:%d/%s/\n", c.Host, c.Port, c.SecretPath)
+			url, note := adminURL(cmd.Context(), c)
+			fmt.Fprintf(out, "URL: %s\n", url)
+			if note != "" {
+				fmt.Fprintf(out, "     %s\n", note)
+			}
 			fmt.Fprintf(out, "Username: %s\n", c.Username)
 			if pw := adminStore.BootstrapPassword(); pw != "" {
 				fmt.Fprintf(out, "Password: %s\n", pw)
@@ -437,7 +443,11 @@ func installCmd() *cobra.Command {
 			} else {
 				fmt.Fprintln(out, "Existing management path and admin login were preserved:")
 			}
-			fmt.Fprintf(out, "  URL:       http://<your-server-ip>:%d/%s/\n", admin.Port, admin.SecretPath)
+			url, note := adminURL(ctx, admin)
+			fmt.Fprintf(out, "  URL:       %s\n", url)
+			if note != "" {
+				fmt.Fprintf(out, "             %s\n", note)
+			}
 			fmt.Fprintf(out, "  Username:  %s\n", admin.Username)
 			if password != "" {
 				fmt.Fprintf(out, "  Password:  %s\n", password)
@@ -450,6 +460,23 @@ func installCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&rotateAdmin, "rotate-admin", false, "Generate a new random management path, username, and password")
 	return cmd
+}
+
+// adminURL renders the management URL with a real address in it, plus a note to
+// print underneath when that address is not internet-reachable. The listener
+// binds a wildcard, so the stored host is "0.0.0.0" — useless to paste into a
+// browser; netx.ResolveAdvertiseHost picks the address a human actually needs.
+func adminURL(ctx context.Context, c security.AdminConfig) (url, note string) {
+	addr := netx.ResolveAdvertiseHost(ctx, c.Host)
+	host := addr.Host
+	switch {
+	case host == "":
+		host = "<your-server-ip>"
+		note = "(no address could be detected on this host)"
+	case !addr.Public:
+		note = "(private address — reachable from this network only)"
+	}
+	return fmt.Sprintf("http://%s/%s/", net.JoinHostPort(host, strconv.Itoa(c.Port)), c.SecretPath), note
 }
 
 func openAppStore(ctx context.Context, cfg *config.Config) (*sql.DB, *store.Repos, error) {
