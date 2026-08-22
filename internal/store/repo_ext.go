@@ -70,6 +70,17 @@ func (r *NodeRepository) MarkProviderSnapshot(ctx context.Context, provider stri
 	return err
 }
 
+// restoreStatusFromProbe rebuilds a node's status from the verdict its last
+// OpenVPN handshake left behind. A cooldown is a timeout, not a verdict — but
+// letting it expire used to write 'unavailable' unconditionally, so any healthy
+// node that was ever blacklisted stayed demoted until some later probe cycle
+// happened to re-test it, invisible to selection the whole time. Restoring
+// without probing must not invent a verdict either, hence reading the old one.
+const restoreStatusFromProbe = `CASE
+		WHEN last_probed_at IS NULL THEN 'discovered'
+		WHEN last_success_at IS NOT NULL AND last_success_at >= last_probed_at THEN 'ready'
+		ELSE 'unavailable' END`
+
 // ActiveBlacklistIDs clears expired entries (restoring node status) and returns
 // the set of currently-blacklisted node ids.
 func (r *NodeRepository) ActiveBlacklistIDs(ctx context.Context) (map[string]bool, error) {
@@ -84,7 +95,7 @@ func (r *NodeRepository) ActiveBlacklistIDs(ctx context.Context) (map[string]boo
 		for _, id := range expired {
 			args = append(args, id)
 		}
-		_, _ = r.db.ExecContext(ctx, "UPDATE proxy_nodes SET status = 'unavailable', cooldown_until = NULL WHERE id IN ("+ph+")", args...)
+		_, _ = r.db.ExecContext(ctx, "UPDATE proxy_nodes SET status = "+restoreStatusFromProbe+", cooldown_until = NULL WHERE id IN ("+ph+")", args...)
 		_, _ = r.db.ExecContext(ctx, "DELETE FROM node_blacklist WHERE node_id IN ("+ph+")", args...)
 	}
 	rows, err := r.db.QueryContext(ctx, "SELECT node_id FROM node_blacklist WHERE expires_at > ?", now)
@@ -135,7 +146,7 @@ func (r *NodeRepository) ClearExpiredBlacklist(ctx context.Context) error {
 	for _, id := range expired {
 		args = append(args, id)
 	}
-	_, _ = r.db.ExecContext(ctx, "UPDATE proxy_nodes SET status = 'unavailable', cooldown_until = NULL WHERE id IN ("+ph+")", args...)
+	_, _ = r.db.ExecContext(ctx, "UPDATE proxy_nodes SET status = "+restoreStatusFromProbe+", cooldown_until = NULL WHERE id IN ("+ph+")", args...)
 	_, err = r.db.ExecContext(ctx, "DELETE FROM node_blacklist WHERE node_id IN ("+ph+")", args...)
 	return err
 }
@@ -202,6 +213,18 @@ func (r *NodeRepository) RecordLiveness(ctx context.Context, aliveIDs, deadIDs [
 	defer func() { _ = tx.Rollback() }()
 	if err := execInChunks(ctx, tx,
 		"UPDATE proxy_nodes SET liveness_failures = 0, last_alive_at = ? WHERE id IN ", []any{tstr(now)}, aliveIDs); err != nil {
+		return err
+	}
+	// Undo the demotion below for hosts that answer again. Without this the
+	// sweep only ever moved nodes downward: a host that went away for one sweep
+	// and came back stayed 'unavailable' forever, since clearing the counter
+	// alone leaves it out of every selection path. Only rows whose last handshake
+	// succeeded go back to 'ready' — a TCP dial is not evidence a tunnel builds,
+	// so nodes that genuinely failed their probe stay where the probe put them.
+	if err := execInChunks(ctx, tx,
+		`UPDATE proxy_nodes SET status = 'ready' WHERE status = 'unavailable'
+		 AND last_probed_at IS NOT NULL AND last_success_at IS NOT NULL
+		 AND last_success_at >= last_probed_at AND id IN `, nil, aliveIDs); err != nil {
 		return err
 	}
 	if err := execInChunks(ctx, tx,
