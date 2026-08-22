@@ -125,10 +125,13 @@ func (g *GatewayService) activate(ctx context.Context, nodeID string) (domain.Tu
 		slog.Warn("activation failed", "module", "gateway", "node", nodeID, "msg", result.Message)
 		return result, nil
 	}
+	// Reaching here means the node completed its handshake, so a routing failure
+	// is ours alone — marking the node unavailable for it would retire a working
+	// exit over a local fault, and every candidate after it in turn.
 	if err := g.router.Setup(ctx, g.cfg.TunnelInterface); err != nil {
 		g.tunnel.Disconnect()
-		_ = g.nodes.MarkUnavailable(ctx, nodeID)
 		g.setLastError(err.Error())
+		slog.Warn("policy routing setup failed", "module", "gateway", "node", nodeID, "err", err)
 		return domain.TunnelStartResult{}, err
 	}
 	g.setLastError("")
