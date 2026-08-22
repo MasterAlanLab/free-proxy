@@ -100,6 +100,15 @@ func (g *GatewayService) activate(ctx context.Context, nodeID string) (domain.Tu
 		return domain.TunnelStartResult{}, err
 	}
 
+	// Release our own tunnel before testing the device name. The availability
+	// check reads the device off running processes' command lines, so it cannot
+	// tell our outgoing OpenVPN from a stranger's: with the incumbent still up,
+	// every rotation failed as "in use by another running tunnel process" and
+	// the caller blacklisted a healthy node for it. Connect tears the old tunnel
+	// down regardless — doing it here only lets the check see the truth. The
+	// validation above still runs first, so a rejected node costs no exit.
+	g.tunnel.Disconnect()
+
 	// Verify the active device name is actually free before OpenVPN gets it —
 	// the same guarantee the probe allocator gives, which the active tunnel
 	// previously went without.

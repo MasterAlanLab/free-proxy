@@ -106,6 +106,20 @@ func (h *HealthService) Check(ctx context.Context, recover bool) domain.ProxyHea
 	return result
 }
 
+// Recover restores an exit when the gateway has none. Check only rotates away
+// from an *active* node, so once a rotation exhausts its candidates and leaves
+// the gateway exitless, nothing else brings it back: that teardown is deliberate,
+// which keeps the unexpected-exit handler silent too. Without this the proxy goes
+// on listening and answering with no upstream, however healthy the pool becomes.
+func (h *HealthService) Recover(ctx context.Context) {
+	settings, err := h.settingsRepo.Get(ctx)
+	if err != nil || !settings.ConnectionEnabled {
+		return
+	}
+	slog.Warn("gateway has no exit node; attempting recovery", "module", "health")
+	_, _ = h.autoSwitch.Switch(ctx)
+}
+
 // HealthMonitor periodically runs Check.
 type HealthMonitor struct {
 	cfg     *config.Config
@@ -130,6 +144,8 @@ func (m *HealthMonitor) Run(ctx context.Context) {
 		case <-t.C:
 			if m.gateway.Status().ActiveNodeID != nil {
 				m.health.Check(ctx, true)
+			} else {
+				m.health.Recover(ctx)
 			}
 			m.State.Heartbeat(true, "")
 		}
